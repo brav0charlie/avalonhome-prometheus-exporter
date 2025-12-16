@@ -220,7 +220,7 @@ avalon_temp_target_celsius
 avalon_temp_ambient_celsius
 ```
 
-> Note: `avalon_temp_ambient_celsius` may report a placeholder value on some models (e.g. Nano 3S), but is exported as-is for compatibility with other A3-series miners.
+> Note: `avalon_temp_ambient_celsius` may report a placeholder value on some models (e.g. Nano 3S), but is exported as-is for compatibility with other Avalon Home-series miners.
 
 ---
 
