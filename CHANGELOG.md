@@ -61,4 +61,4 @@ This project follows semantic versioning: https://semver.org/
 - Chip-level metrics are disabled by default to avoid unnecessary cardinality
 - The exporter health endpoint reflects exporter availability, not miner reachability
 
-[v0.1.0]: https://github.com/brav0charlie/avalon-prometheus-exporter/releases/tag/v0.1.0
+[v0.1.0]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.1.0
