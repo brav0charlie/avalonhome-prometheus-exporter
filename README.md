@@ -153,6 +153,8 @@ Only one of `AVALON_IP` or `AVALON_IPS` must be set.
 
 ## 📡 Exported Metrics
 
+For detailed information, see `FIELDS-README.md`.
+
 All metrics include the label:
 
 ```
@@ -341,6 +343,7 @@ avalonhome-prometheus-exporter/
 ├── CHANGELOG.md
 ├── docker-compose.yml
 ├── Dockerfile
+├── FIELDS-README.md
 ├── LICENSE
 └── README.md
 ```
