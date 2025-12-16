@@ -369,6 +369,6 @@ MIT License
 
 ### ❤️ Acknowledgements
 
-Yes, this project was vibe-coded.
-Yes, it works.
-No, we’re not sorry.
+Yes, this project was vibe-coded.  
+Yes, it works.  
+No, we’re not sorry.  
