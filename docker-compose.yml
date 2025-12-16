@@ -1,0 +1,17 @@
+services:
+  avalon3-exporter:
+    container_name: avalonhome-exporter
+    image: ghcr.io/brav0charlie/avalonhome-prometheus-exporter:v0.1.0
+    # If you prefer to build yourself, comment the dockerfile above and use:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+
+    # Use host networking so the container can reach miners on your LAN
+    network_mode: host
+
+    env_file:
+      - .env
+
+    restart: unless-stopped
+    

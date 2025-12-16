@@ -1,0 +1,74 @@
+name: Build and Publish Docker Image (Release Only)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.0). Leave blank to use the current ref name."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: brav0charlie/avalonhome-prometheus-exporter
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine tag to publish
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # For "release published" events, GITHUB_REF_NAME is the release tag.
+          # For manual runs, allow an explicit input override.
+          TAG_INPUT="${{ github.event.inputs.tag }}"
+          if [[ -n "${TAG_INPUT}" ]]; then
+            TAG="${TAG_INPUT}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ -z "${TAG}" ]]; then
+            echo "ERROR: No tag could be determined. Provide workflow_dispatch input 'tag'."
+            exit 1
+          fi
+
+          # Strip accidental refs/tags/ prefix if someone pastes it.
+          TAG="${TAG#refs/tags/}"
+
+          echo "TAG=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Publishing tag: ${TAG}"
+
+      - name: Build and push Docker image (version + latest)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
