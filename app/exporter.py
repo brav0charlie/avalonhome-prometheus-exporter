@@ -628,6 +628,13 @@ def poller_loop():
                         status_changes_total[ip] = status_changes_total.get(ip, 0.0) + 1.0
                         status_downs_total[ip] = status_downs_total.get(ip, 0.0) + 1.0
 
+                    # 🔥 IMPORTANT: drop cached samples so Prometheus sees "no data"
+                    latest_metrics.pop(ip, None)
+                    latest_pools.pop(ip, None)
+                    latest_chips.pop(ip, None)
+                    # optional: keep version_info, or clear it too if you prefer:
+                    # version_info.pop(ip, None)
+
         time.sleep(UPDATE_INTERVAL)
 
 # ======================
