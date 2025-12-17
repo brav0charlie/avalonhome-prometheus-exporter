@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [v0.1.1] - 2025-12-17
+
+### Fixed
+- Prevented stale miner telemetry from being continuously exported when a miner becomes unreachable. On scrape failures, cached per-miner metrics are now dropped so Prometheus correctly marks the series as stale.
+- Resolved an issue where Grafana dashboards could appear to show miners online and reporting constant values throughout downtime due to cached exporter state.
+- Ensured miner downtime is accurately reflected as gaps in time-series panels rather than flat “last known value” lines.
+
+### Notes
+- Availability and health metrics (`avalon_up`, `avalon_last_scrape_timestamp_seconds`, and downtime counters) continue to be exported during miner outages for visibility and alerting.
+- This change affects exporter behavior only and does not modify metric names, labels, or units.
+- Recommended for all users running Grafana dashboards that rely on visual gap detection for miner outages.
+
+[v0.1.1]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.1.1
+
+
+
 ## [v0.1.0] - 2025-12-16
 
 ### Added

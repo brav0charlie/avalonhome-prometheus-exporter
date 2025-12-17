@@ -886,7 +886,7 @@
               "mode": "off"
             }
           },
-          "displayName": "power efficiency (W / TH/s)",
+          "displayName": "Power Efficiency (W / TH/s)",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1126,8 +1126,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_fan1_rpm{ip=\"$miner\"}",
-          "legendFormat": "Fan1 RPM",
+          "legendFormat": "Fan 1 RPM",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1356,8 +1358,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_temp_target_celsius{ip=\"$miner\"}",
-          "legendFormat": "target",
+          "legendFormat": "Target",
+          "range": true,
           "refId": "C"
         },
         {
@@ -1376,8 +1380,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_temp_outlet_celsius{ip=\"$miner\"}",
-          "legendFormat": "outlet",
+          "legendFormat": "Outlet",
+          "range": true,
           "refId": "E"
         }
       ],
@@ -1734,6 +1740,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "avalon_chip_matching_work_sum{ip=\"$miner\"}",
+          "hide": true,
           "legendFormat": "sum",
           "refId": "D"
         }
@@ -1830,8 +1837,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_mpo_target{ip=\"$miner\"}",
-          "legendFormat": "MPO target",
+          "legendFormat": "Miner Power Output Target (W)",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1839,26 +1848,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "avalon_power_vout{ip=\"$miner\"}",
-          "legendFormat": "Vout",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avalon_power_iout{ip=\"$miner\"}",
-          "legendFormat": "Iout",
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avalon_power_vout_cmd{ip=\"$miner\"}",
-          "legendFormat": "VoutCmd",
+          "editorMode": "code",
+          "expr": "avalon_power_vout_cmd{ip=\"$miner\"} / 1000",
+          "legendFormat": "PSU Commanded Voltage (V)",
+          "range": true,
           "refId": "D"
         },
         {
@@ -1866,45 +1859,49 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
+          "expr": "avalon_power_vout{ip=\"$miner\"} / 1000",
+          "legendFormat": "PSU Output Voltage (V)",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avalon_power_iout{ip=\"$miner\"}",
+          "legendFormat": "PSU Output Current (A)",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "(avalon_power_vout{ip=\"$miner\"} / 1000)\n*\navalon_power_iout{ip=\"$miner\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "PSU Output Power (W)",
+          "range": true,
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
           "expr": "avalon_power_pout_wall{ip=\"$miner\"}",
-          "legendFormat": "PoutWall",
+          "legendFormat": "Wall Power Draw (W)",
+          "range": true,
           "refId": "E"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "avalon_ps_slot_0{ip=\"$miner\"} != 0",
-          "legendFormat": "PS[0]",
-          "range": true,
-          "refId": "F"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "avalon_ps_slot_2{ip=\"$miner\"} != 0",
-          "legendFormat": "PS[2]",
-          "range": true,
-          "refId": "G"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "avalon_ps_slot_3{ip=\"$miner\"} != 0",
-          "legendFormat": "PS[3]",
-          "range": true,
-          "refId": "H"
         }
       ],
-      "title": "Power + MPO (Decoded + Raw)",
+      "title": "Power",
       "type": "timeseries"
     },
     {
@@ -1996,8 +1993,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_pool_up{ip=\"$miner\"}",
-          "legendFormat": "pool {{pool_index}} ({{status}})",
+          "legendFormat": "Pool {{pool_index}} ({{status}})",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -2094,8 +2093,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_pool_rejected_percent{ip=\"$miner\",pool_index=\"$pool\"}",
-          "legendFormat": "rejected %",
+          "legendFormat": "Rejected %",
+          "range": true,
           "refId": "A"
         },
         {
@@ -2103,8 +2104,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_pool_stale_percent{ip=\"$miner\",pool_index=\"$pool\"}",
-          "legendFormat": "stale %",
+          "legendFormat": "Stale %",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -2201,8 +2204,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "rate(avalon_pool_shares_accepted_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
           "legendFormat": "accepted/s",
+          "range": true,
           "refId": "A"
         },
         {
@@ -2699,14 +2704,14 @@
     ]
   },
   "time": {
-    "from": "2025-12-16T14:51:05.447Z",
-    "to": "2025-12-16T16:26:40.331Z"
+    "from": "now-3h",
+    "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Avalon Home Miner Dashboard",
   "uid": "avalon-dashboard",
-  "version": 3,
+  "version": 4,
   "weekStart": "",
   "id": null
 }
