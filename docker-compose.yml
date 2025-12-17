@@ -1,7 +1,7 @@
 services:
   avalon3-exporter:
     container_name: avalonhome-exporter
-    image: ghcr.io/brav0charlie/avalonhome-prometheus-exporter:v0.1.0
+    image: ghcr.io/brav0charlie/avalonhome-prometheus-exporter:v0.1.1
     # If you prefer to build yourself, comment the dockerfile above and use:
     # build:
     #   context: .
