@@ -236,7 +236,7 @@ In addition to raw slots, exporter.py decodes specific indices into named metric
 
 These fields are parsed from STATS=0 and exported in two ways:
 1) **aggregate** metrics (always, if fields exist), and
-2) **per-chip** series (only if `EXPORT_CHIP_METRICS=true`).
+2) **per-chip** series (only if `EXPORT_CHIP_METRICS=true`). Chips are indexed padded to 3 digits for support of up to 999 chips.
 
 ### 6.1 `PVT_T0[ ... ]` — per-chip temperature list
 
