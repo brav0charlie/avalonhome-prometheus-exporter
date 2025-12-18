@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [v0.1.2] - 2025-12-18
+
+### Fixed
+- Corrected per-chip series ordering in Grafana by zero-padding chip index labels to three digits (`001`, `002`, …). This ensures numeric ordering instead of lexicographic ordering (for example, `1, 10, 2`).
+
+### Notes
+- This change updates the `chip` label format for per-chip metrics (for example, `chip="001"` instead of `chip="1"`).
+- Any Grafana dashboards, panel overrides, variables, or alerts that reference specific chip label values must be updated accordingly.
+- Three-digit padding was chosen to support potential future miners with higher chip counts (e.g. Avalon Q series).
+
+[v0.1.2]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.1.2
+
+
+
 ## [v0.1.1] - 2025-12-17
 
 ### Fixed
