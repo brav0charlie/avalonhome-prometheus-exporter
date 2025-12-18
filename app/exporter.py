@@ -475,11 +475,14 @@ def collect_for(ip: str, port: int):
     # Optional per-chip metrics
     if EXPORT_CHIP_METRICS:
         for idx, val in enumerate(chip_t):
-            chips.append({"labels": {"chip": str(idx)}, "metrics": {"avalon_chip_temp_celsius": float(val)}})
+            chip_label = f"{idx:03d}"
+            chips.append({"labels": {"chip": chip_label}, "metrics": {"avalon_chip_temp_celsius": float(val)}})
         for idx, val in enumerate(chip_v_ints):
-            chips.append({"labels": {"chip": str(idx)}, "metrics": {"avalon_chip_voltage_volts": float(val) / 100.0}})
+            chip_label = f"{idx:03d}"
+            chips.append({"labels": {"chip": chip_label}, "metrics": {"avalon_chip_voltage_volts": float(val) / 100.0}})
         for idx, val in enumerate(chip_mw):
-            chips.append({"labels": {"chip": str(idx)}, "metrics": {"avalon_chip_matching_work": float(val)}})
+            chip_label = f"{idx:03d}"
+            chips.append({"labels": {"chip": chip_label}, "metrics": {"avalon_chip_matching_work": float(val)}})
 
     # -------- Per-pool metrics --------
     pool_map: dict[str, dict[str, object]] = {}
