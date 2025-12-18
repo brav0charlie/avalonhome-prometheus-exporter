@@ -12,6 +12,12 @@
   "__elements": {},
   "__requires": [
     {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
@@ -331,7 +337,7 @@
           "refId": "A"
         }
       ],
-      "title": "Outlet Temp (ºC)",
+      "title": "Outlet Temp (°C)",
       "type": "stat"
     },
     {
@@ -459,8 +465,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "avalon_pool_up{ip=\"$miner\",pool_index=\"0\"}",
+          "editorMode": "code",
+          "expr": "max by (ip, pool_index) (avalon_pool_up{ip=\"$miner\", pool_index=\"0\"})",
           "legendFormat": "pool0",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -778,10 +786,6 @@
               {
                 "color": "green",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -798,7 +802,9 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -825,8 +831,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_hashrate_moving_ghs{ip=\"$miner\"} / 1000",
-          "legendFormat": "moving",
+          "legendFormat": "moving avg",
+          "range": true,
           "refId": "B"
         },
         {
@@ -834,8 +842,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_hashrate_avg_ghs{ip=\"$miner\"} / 1000",
-          "legendFormat": "long avg",
+          "legendFormat": "avg",
+          "range": true,
           "refId": "C"
         }
       ],
@@ -897,7 +907,7 @@
               }
             ]
           },
-          "unit": "watt"
+          "unit": "W / TH/s"
         },
         "overrides": []
       },
@@ -910,8 +920,10 @@
       "id": 104,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -1009,7 +1021,9 @@
       "id": 8,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1108,7 +1122,9 @@
       "id": 105,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1207,7 +1223,9 @@
       "id": 9,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1322,7 +1340,9 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1462,7 +1482,9 @@
       "id": 16,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1578,7 +1600,9 @@
       "id": 17,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1694,7 +1718,9 @@
       "id": 18,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1819,7 +1845,9 @@
       "id": 19,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -1968,14 +1996,16 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 54
       },
       "id": 10,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -2001,117 +2031,6 @@
         }
       ],
       "title": "Pool Up Status (All Pools)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 3,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 54
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "avalon_pool_rejected_percent{ip=\"$miner\",pool_index=\"$pool\"}",
-          "legendFormat": "Rejected %",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "avalon_pool_stale_percent{ip=\"$miner\",pool_index=\"$pool\"}",
-          "legendFormat": "Stale %",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Pool $pool Rejected / Stale %",
       "type": "timeseries"
     },
     {
@@ -2186,7 +2105,9 @@
       "id": 12,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -2276,6 +2197,119 @@
               "mode": "off"
             }
           },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 63
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avalon_pool_rejected_percent{ip=\"$miner\",pool_index=\"$pool\"}",
+          "legendFormat": "Rejected %",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avalon_pool_stale_percent{ip=\"$miner\",pool_index=\"$pool\"}",
+          "legendFormat": "Stale %",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Pool $pool Rejected / Stale %",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "decimals": 2,
           "fieldMinMax": false,
           "mappings": [],
@@ -2299,13 +2333,15 @@
       "gridPos": {
         "h": 11,
         "w": 12,
-        "x": 12,
-        "y": 63
+        "x": 0,
+        "y": 74
       },
       "id": 20,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -2323,8 +2359,11 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "rate(avalon_pool_bytes_sent_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
-          "legendFormat": "bytes sent/s",
+          "interval": "",
+          "legendFormat": "TX ↑ bytes/s",
+          "range": true,
           "refId": "A"
         },
         {
@@ -2336,10 +2375,98 @@
           "exemplar": false,
           "expr": "rate(avalon_pool_bytes_recv_total{ip=\"$miner\",pool_index=\"$pool\"}[5m]) * -1",
           "instant": false,
-          "legendFormat": "bytes recv/s",
+          "legendFormat": "RX ↓ bytes/s",
           "range": true,
           "refId": "B"
+        }
+      ],
+      "title": "Pool $pool Transport (bytes/s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "mps"
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 74
+      },
+      "id": 106,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
@@ -2347,7 +2474,7 @@
           },
           "editorMode": "code",
           "expr": "rate(avalon_pool_times_sent_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
-          "legendFormat": "msgs sent/s",
+          "legendFormat": "TX ↑ msgs/s",
           "range": true,
           "refId": "C"
         },
@@ -2358,13 +2485,149 @@
           },
           "editorMode": "code",
           "expr": "rate(avalon_pool_times_recv_total{ip=\"$miner\",pool_index=\"$pool\"}[5m]) * -1",
-          "legendFormat": "msgs recv/s",
+          "legendFormat": "RX ↓ msgs/s",
           "range": true,
           "refId": "D"
         }
       ],
-      "title": "Pool $pool Transport (bytes/s)",
+      "title": "Pool $pool Transport (msgs/s)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 85
+      },
+      "id": 107,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "noDataState": "hidden",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avalon_chip_temp_celsius{ip=\"$miner\"}",
+          "legendFormat": "chip {{chip}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Chip Temperature (EXPORT_CHIP_METRICS)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 85
+      },
+      "id": 108,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "noDataState": "hidden",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avalon_chip_voltage_volts{ip=\"$miner\"}",
+          "legendFormat": "chip {{chip}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Chip Voltage (EXPORT_CHIP_METRICS)",
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -2432,13 +2695,15 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 95
       },
       "id": 101,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "table",
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -2456,8 +2721,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "avalon_chip_temp_celsius{ip=\"$miner\"}",
           "legendFormat": "chip {{chip}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -2531,13 +2798,15 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 95
       },
       "id": 102,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "table",
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -2629,13 +2898,15 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 105
       },
       "id": 103,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "table",
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -2711,7 +2982,7 @@
   "timezone": "browser",
   "title": "Avalon Home Miner Dashboard",
   "uid": "avalon-dashboard",
-  "version": 4,
+  "version": 16,
   "weekStart": "",
   "id": null
 }
