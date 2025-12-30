@@ -1,39 +1,4 @@
-{
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "panel",
-      "id": "gauge",
-      "name": "Gauge",
-      "version": ""
-    },
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "12.3.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
+     "version": ""
     },
     {
       "type": "panel",
@@ -61,6 +26,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": null,
   "links": [],
   "panels": [
     {
@@ -71,7 +37,48 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [],
-          "thresholds": {
+    {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "12.3.1"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+       "thresholds": {
             "mode": "absolute",
             "steps": [
               {
@@ -90,7 +97,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 5,
+        "w": 3,
         "x": 0,
         "y": 0
       },
@@ -112,7 +119,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -159,8 +166,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 6,
-        "x": 5,
+        "w": 5,
+        "x": 3,
         "y": 0
       },
       "id": 2,
@@ -181,7 +188,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -229,7 +236,7 @@
       "gridPos": {
         "h": 3,
         "w": 4,
-        "x": 11,
+        "x": 8,
         "y": 0
       },
       "id": 3,
@@ -250,7 +257,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -302,7 +309,7 @@
       "gridPos": {
         "h": 3,
         "w": 4,
-        "x": 15,
+        "x": 12,
         "y": 0
       },
       "id": 21,
@@ -323,7 +330,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -372,8 +379,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 5,
-        "x": 19,
+        "w": 4,
+        "x": 16,
         "y": 0
       },
       "id": 4,
@@ -394,7 +401,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -408,6 +415,79 @@
       ],
       "title": "Fan1 RPM",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 109,
+      "options": {
+        "displayMode": "lcd",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "avalon_fan_duty_percent{ip=\"$miner\"}",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
+        }
+      ],
+      "title": "Fan Duty %",
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -436,7 +516,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 5,
+        "w": 3,
         "x": 0,
         "y": 3
       },
@@ -458,7 +538,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -472,7 +552,7 @@
           "refId": "A"
         }
       ],
-      "title": "Primary Pool Up (pool 0)",
+      "title": "Pool 0 Up",
       "type": "stat"
     },
     {
@@ -500,7 +580,7 @@
       "gridPos": {
         "h": 3,
         "w": 5,
-        "x": 5,
+        "x": 3,
         "y": 3
       },
       "id": 13,
@@ -512,7 +592,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "last"
           ],
           "fields": "",
           "values": false
@@ -521,15 +601,19 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "avalon_pool_current_block_height{ip=\"$miner\",pool_index=\"0\"}",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max without (job, instance, url, status, priority, id) (\n  avalon_pool_current_block_height{ip=\"$miner\", pool_index=\"0\"}\n)",
+          "instant": false,
           "legendFormat": "height",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -541,6 +625,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -562,8 +647,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 5,
-        "x": 10,
+        "w": 4,
+        "x": 8,
         "y": 3
       },
       "id": 22,
@@ -575,7 +660,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "last"
           ],
           "fields": "",
           "values": false
@@ -584,7 +669,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -592,13 +677,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avalon_best_share{ip=\"$miner\"}",
+          "expr": "max_over_time(avalon_best_share{ip=\"$miner\"}[24h])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Session Best Difficulty",
+      "title": "Best Share (24h)",
       "type": "stat"
     },
     {
@@ -627,8 +712,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 5,
-        "x": 15,
+        "w": 4,
+        "x": 12,
         "y": 3
       },
       "id": 23,
@@ -640,7 +725,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "max"
+            "last"
           ],
           "fields": "",
           "values": false
@@ -649,7 +734,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -657,13 +742,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "max_over_time(avalon_best_share{ip=\"$miner\"}[180d])",
+          "expr": "max_over_time(avalon_best_share{ip=\"$miner\"}[365d])",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Best Difficulty (6 month)",
+      "title": "Best Share (365d)",
       "type": "stat"
     },
     {
@@ -688,14 +773,14 @@
               }
             ]
           },
-          "unit": "s"
+          "unit": "dtdhms"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 3,
         "w": 4,
-        "x": 20,
+        "x": 16,
         "y": 3
       },
       "id": 15,
@@ -716,7 +801,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -730,6 +815,217 @@
       ],
       "title": "Down Duration",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "mappings": [],
+          "max": 140,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 20,
+        "y": 3
+      },
+      "id": 110,
+      "options": {
+        "displayMode": "lcd",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "avalon_power_pout_wall{ip=\"$miner\"}",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
+        }
+      ],
+      "title": "Power Draw",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "max": 110,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 85
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 107,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "noDataState": "hidden",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avalon_chip_temp_celsius{ip=\"$miner\"}",
+          "legendFormat": "chip {{chip}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Chip Temperature (°C)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "mappings": [],
+          "max": 3.5,
+          "min": 2.5,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 3.2
+              }
+            ]
+          },
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 108,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "noDataState": "hidden",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avalon_chip_voltage_volts{ip=\"$miner\"}",
+          "legendFormat": "chip {{chip}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Chip Voltage (V)",
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -797,7 +1093,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 14
       },
       "id": 6,
       "options": {
@@ -815,7 +1111,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -915,7 +1211,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 14
       },
       "id": 104,
       "options": {
@@ -933,7 +1229,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "editorMode": "code",
@@ -1016,7 +1312,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 23
       },
       "id": 8,
       "options": {
@@ -1034,7 +1330,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1117,7 +1413,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 23
       },
       "id": 105,
       "options": {
@@ -1135,7 +1431,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1218,7 +1514,7 @@
         "h": 11,
         "w": 12,
         "x": 0,
-        "y": 23
+        "y": 31
       },
       "id": 9,
       "options": {
@@ -1236,7 +1532,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1335,7 +1631,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 23
+        "y": 31
       },
       "id": 7,
       "options": {
@@ -1353,7 +1649,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1477,7 +1773,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 42
       },
       "id": 16,
       "options": {
@@ -1495,7 +1791,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1595,7 +1891,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 42
       },
       "id": 17,
       "options": {
@@ -1613,7 +1909,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1713,7 +2009,7 @@
         "h": 11,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 51
       },
       "id": 18,
       "options": {
@@ -1731,7 +2027,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1840,7 +2136,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 51
       },
       "id": 19,
       "options": {
@@ -1858,7 +2154,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1998,7 +2294,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 62
       },
       "id": 10,
       "options": {
@@ -2016,7 +2312,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2100,7 +2396,7 @@
         "h": 11,
         "w": 12,
         "x": 0,
-        "y": 63
+        "y": 71
       },
       "id": 12,
       "options": {
@@ -2118,7 +2414,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2126,7 +2422,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(avalon_pool_shares_accepted_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
+          "expr": "rate(\n  max without (status, url, priority, id) (\n    avalon_pool_shares_accepted_total{ip=\"$miner\", pool_index=\"$pool\"}\n  )[5m]\n)",
           "legendFormat": "accepted/s",
           "range": true,
           "refId": "A"
@@ -2136,8 +2432,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "rate(avalon_pool_shares_rejected_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
+          "editorMode": "code",
+          "expr": "rate(\n  max without (status, url, priority, id) (\n    avalon_pool_shares_rejected_total{ip=\"$miner\", pool_index=\"$pool\"}\n  )[5m]\n)",
           "legendFormat": "rejected/s",
+          "range": true,
           "refId": "B"
         },
         {
@@ -2145,8 +2443,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "rate(avalon_pool_stale_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
+          "editorMode": "code",
+          "expr": "rate(\n  max without (status, url, priority, id) (\n    avalon_pool_stale_total{ip=\"$miner\", pool_index=\"$pool\"}\n  )[5m]\n)",
           "legendFormat": "stale/s",
+          "range": true,
           "refId": "C"
         }
       ],
@@ -2220,7 +2520,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 63
+        "y": 71
       },
       "id": 11,
       "options": {
@@ -2238,7 +2538,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2246,7 +2546,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avalon_pool_rejected_percent{ip=\"$miner\",pool_index=\"$pool\"}",
+          "expr": "max without (status, url, priority, id) (\n  avalon_pool_rejected_percent{ip=\"$miner\", pool_index=\"$pool\"}\n)",
           "legendFormat": "Rejected %",
           "range": true,
           "refId": "A"
@@ -2257,7 +2557,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avalon_pool_stale_percent{ip=\"$miner\",pool_index=\"$pool\"}",
+          "expr": "max without (status, url, priority, id) (\n  avalon_pool_stale_percent{ip=\"$miner\", pool_index=\"$pool\"}\n)",
           "legendFormat": "Stale %",
           "range": true,
           "refId": "B"
@@ -2278,7 +2578,7 @@
           },
           "custom": {
             "axisBorderShow": false,
-            "axisCenteredZero": false,
+            "axisCenteredZero": true,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
@@ -2334,7 +2634,7 @@
         "h": 11,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 82
       },
       "id": 20,
       "options": {
@@ -2352,7 +2652,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2360,7 +2660,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(avalon_pool_bytes_sent_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
+          "expr": "max without (status, url, priority, id) (\n  rate(avalon_pool_bytes_sent_total{ip=\"$miner\", pool_index=\"$pool\"}[5m])\n)",
           "interval": "",
           "legendFormat": "TX ↑ bytes/s",
           "range": true,
@@ -2373,7 +2673,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(avalon_pool_bytes_recv_total{ip=\"$miner\",pool_index=\"$pool\"}[5m]) * -1",
+          "expr": "- max without (status, url, priority, id) (\n    rate(avalon_pool_bytes_recv_total{ip=\"$miner\", pool_index=\"$pool\"}[5m])\n  )",
           "instant": false,
           "legendFormat": "RX ↓ bytes/s",
           "range": true,
@@ -2395,7 +2695,7 @@
           },
           "custom": {
             "axisBorderShow": false,
-            "axisCenteredZero": false,
+            "axisCenteredZero": true,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
@@ -2447,7 +2747,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 82
       },
       "id": 106,
       "options": {
@@ -2465,7 +2765,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2473,7 +2773,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(avalon_pool_times_sent_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])",
+          "expr": "max without (status, url, priority, id) (\n  rate(avalon_pool_times_sent_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])\n)",
           "legendFormat": "TX ↑ msgs/s",
           "range": true,
           "refId": "C"
@@ -2484,7 +2784,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "rate(avalon_pool_times_recv_total{ip=\"$miner\",pool_index=\"$pool\"}[5m]) * -1",
+          "expr": "- max without (status, url, priority, id) (\n  rate(avalon_pool_times_recv_total{ip=\"$miner\",pool_index=\"$pool\"}[5m])\n)\n",
           "legendFormat": "RX ↓ msgs/s",
           "range": true,
           "refId": "D"
@@ -2492,142 +2792,6 @@
       ],
       "title": "Pool $pool Transport (msgs/s)",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "unit": "celsius"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 85
-      },
-      "id": 107,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "noDataState": "hidden",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
-      },
-      "pluginVersion": "12.3.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "avalon_chip_temp_celsius{ip=\"$miner\"}",
-          "legendFormat": "chip {{chip}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Per-Chip Temperature (EXPORT_CHIP_METRICS)",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "unit": "volt"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 85
-      },
-      "id": 108,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "noDataState": "hidden",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
-      },
-      "pluginVersion": "12.3.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avalon_chip_voltage_volts{ip=\"$miner\"}",
-          "legendFormat": "chip {{chip}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Per-Chip Voltage (EXPORT_CHIP_METRICS)",
-      "type": "gauge"
     },
     {
       "datasource": {
@@ -2695,7 +2859,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 95
+        "y": 93
       },
       "id": 101,
       "options": {
@@ -2714,7 +2878,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2728,7 +2892,7 @@
           "refId": "A"
         }
       ],
-      "title": "Per-Chip Temperature (EXPORT_CHIP_METRICS)",
+      "title": "Per-Chip Temperature",
       "type": "timeseries"
     },
     {
@@ -2798,7 +2962,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 95
+        "y": 93
       },
       "id": 102,
       "options": {
@@ -2817,7 +2981,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2829,7 +2993,7 @@
           "refId": "A"
         }
       ],
-      "title": "Per-Chip Voltage (EXPORT_CHIP_METRICS)",
+      "title": "Per-Chip Voltage",
       "type": "timeseries"
     },
     {
@@ -2898,7 +3062,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 105
+        "y": 103
       },
       "id": 103,
       "options": {
@@ -2917,7 +3081,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -2929,7 +3093,7 @@
           "refId": "A"
         }
       ],
-      "title": "Per-Chip Matching-Work (EXPORT_CHIP_METRICS)",
+      "title": "Per-Chip Matching-Work",
       "type": "timeseries"
     }
   ],
@@ -2982,7 +3146,7 @@
   "timezone": "browser",
   "title": "Avalon Home Miner Dashboard",
   "uid": "avalon-dashboard",
-  "version": 16,
-  "weekStart": "",
-  "id": null
+  "version": 33,
+  "weekStart": ""
 }
+
