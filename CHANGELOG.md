@@ -4,6 +4,59 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [v0.2.0] - 2025-12-28
+
+### Added
+- Structured logging with configurable log levels via `LOG_LEVEL` environment variable (default: `INFO`)
+- Exporter version information metric `avalon_exporter_info{version="0.2.0"}`
+- Per-miner scrape duration metric `avalon_scrape_duration_seconds{ip="..."}` for performance monitoring
+- Error categorization with separate metrics for each error type:
+  - `avalon_scrape_errors_timeout_total` - Timeout errors
+  - `avalon_scrape_errors_connection_refused_total` - Connection refused errors
+  - `avalon_scrape_errors_network_total` - Network/unreachable errors
+  - `avalon_scrape_errors_parse_total` - Parse/empty response errors
+  - `avalon_scrape_errors_other_total` - All other errors
+- Parallel scraping for multiple miners using threads (significantly faster for multiple miners)
+- HTTP endpoints for debugging and version information:
+  - `/version` - JSON response with exporter version
+  - `/debug` - JSON response with internal state (configuration, poller status, per-miner state)
+- Graceful shutdown handling for SIGTERM and SIGINT signals
+- Version information exposed in `/health` endpoint response
+- `MINER_TIMEOUT` environment variable for configurable TCP connection timeout (default: `5.0` seconds)
+- Configuration validation at startup with clear error messages for invalid values
+- Improved error handling with specific exception types and descriptive error messages
+- Comprehensive documentation:
+  - `TROUBLESHOOTING.md` - Troubleshooting guide for common issues, error types, and debugging
+  - `DEPLOYMENT.md` - Production deployment guide with Docker, systemd, performance tuning, and monitoring
+
+### Changed
+- Replaced `print()` statements with structured logging using Python's `logging` module
+- Refactored `collect_for()` function into smaller, focused helper functions for better maintainability:
+  - `_parse_miner_metrics()` - Parse miner-level metrics
+  - `_parse_chip_metrics()` - Parse chip-level metrics and aggregates
+  - `_parse_pool_metrics()` - Parse pool metrics
+  - `_format_prometheus_labels()` - Extract label formatting logic
+- Refactored `poller_loop()` to scrape miners in parallel using threads (v0.2.0+)
+- Improved code organization with complete type hints and TypedDict definitions
+- Dockerfile now sets app user/group to UID/GID 1000 for consistent permissions
+- Updated README.md with all new features, endpoints, error categorization metrics, and documentation links
+- Updated `.env.example` with `LOG_LEVEL` configuration option
+
+### Notes
+- All changes maintain backward compatibility
+- Logging uses standard library only (still zero-dependency)
+- Parallel scraping significantly improves performance when monitoring multiple miners (total cycle time ≈ max(individual scrape times) instead of sum)
+- Error categorization provides better observability for diagnosing miner connectivity issues
+- Graceful shutdown allows in-flight scrapes to complete before stopping
+- Scrape duration metrics help identify slow miners or network issues
+- Configuration validation prevents runtime errors from invalid settings
+- Version information in health endpoint and metrics aids troubleshooting and monitoring
+- Debug endpoint provides comprehensive internal state for troubleshooting without requiring log access
+
+[v0.2.0]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.2.0
+
+
+
 ## [v0.1.2] - 2025-12-18
 
 ### Fixed

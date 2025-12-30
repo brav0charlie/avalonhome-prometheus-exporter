@@ -45,7 +45,14 @@ The exporter polls miners over their CGMiner TCP API (default port **4028**) and
 
 ✔ Dynamic Prometheus labels (model, firmware, pool_index, URL, etc.)  
 ✔ Pure Python single-file exporter (standard library only)  
-✔ Single Docker image (Python 3.12 Alpine)
+✔ Single Docker image (Python 3.12 Alpine)  
+✔ Configuration validation with clear error messages  
+✔ Improved error handling with specific exception types  
+✔ Structured logging with configurable log levels  
+✔ Parallel scraping for multiple miners (faster performance)  
+✔ Error categorization by type (timeout, connection refused, network, parse, other)  
+✔ Graceful shutdown handling  
+✔ Debug and version endpoints for troubleshooting
 
 ---
 
@@ -84,6 +91,14 @@ EXPORTER_PORT=9100
 # --- Extended Metrics ---
 # Enable extra high-cardinality / per-chip telemetry (PVT_V0, MW0, etc.)
 EXPORT_CHIP_METRICS=false
+
+# --- Miner API Timeout (optional) ---
+# TCP connection timeout in seconds (default: 5.0)
+MINER_TIMEOUT=5.0
+
+# --- Logging Configuration (optional) ---
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
+#LOG_LEVEL=INFO
 ```
 
 3. Start the exporter:
@@ -104,6 +119,14 @@ docker compose logs -f avalon-exporter
 http://localhost:9100/metrics
 ```
 
+6. Check exporter health and version:
+
+```
+http://localhost:9100/health
+http://localhost:9100/version
+http://localhost:9100/debug
+```
+
 ---
 
 ## 🐳 Docker Usage
@@ -119,6 +142,8 @@ docker run -d \
   -e UPDATE_INTERVAL=15 \
   -e EXPORTER_PORT=9100 \
   -e EXPORT_CHIP_METRICS=false \
+  -e MINER_TIMEOUT=5.0 \
+  -e LOG_LEVEL=INFO \
   avalonhome-prometheus-exporter
 ```
 
@@ -133,6 +158,8 @@ docker run -d \
   -e UPDATE_INTERVAL=15 \
   -e EXPORTER_PORT=9100 \
   -e EXPORT_CHIP_METRICS=false \
+  -e MINER_TIMEOUT=5.0 \
+  -e LOG_LEVEL=INFO \
   avalonhome-prometheus-exporter
 ```
 
@@ -143,11 +170,15 @@ docker run -d \
 - `AVALON_IP` — Single miner hostname/IP
 - `AVALON_IPS` — Comma-separated miners
 - `AVALON_PORT` — Miner TCP API port (default: `4028`)
-- `UPDATE_INTERVAL` — Polling frequency in seconds (default: `10`)
-- `EXPORTER_PORT` — Exporter HTTP port (default: `9100`)
+- `UPDATE_INTERVAL` — Polling frequency in seconds (default: `10`, must be > 0)
+- `EXPORTER_PORT` — Exporter HTTP port (default: `9100`, must be 1-65535)
 - `EXPORT_CHIP_METRICS` — Enable per-chip telemetry (PVT_V0, MW0, and other high-cardinality metrics)
+- `MINER_TIMEOUT` — TCP connection timeout to miner API in seconds (default: `5.0`, must be > 0)
+- `LOG_LEVEL` — Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: `INFO`)
 
 Only one of `AVALON_IP` or `AVALON_IPS` must be set.
+
+**Configuration Validation:** The exporter validates all configuration values at startup and will exit with clear error messages if any values are invalid (e.g., negative intervals, out-of-range ports, invalid hostnames).
 
 ---
 
@@ -169,11 +200,25 @@ ip="192.168.x.x"
 avalon_up
 avalon_last_scrape_timestamp_seconds
 avalon_down_duration_seconds
+avalon_scrape_duration_seconds
 avalon_scrape_errors_total
+avalon_scrape_errors_timeout_total
+avalon_scrape_errors_connection_refused_total
+avalon_scrape_errors_network_total
+avalon_scrape_errors_parse_total
+avalon_scrape_errors_other_total
 avalon_status_changes_total
 avalon_status_ups_total
 avalon_status_downs_total
 ```
+
+### 📊 Exporter Metrics
+
+```
+avalon_exporter_info{version="0.2.0"} 1
+```
+
+The exporter also exposes its own version information and scrape duration metrics for monitoring exporter performance.
 
 ---
 
@@ -308,6 +353,35 @@ Grafana panels consuming these metrics should be configured to **hide when no da
 
 ---
 
+## 🌐 HTTP Endpoints
+
+The exporter provides several HTTP endpoints:
+
+- `/metrics` — Prometheus metrics (main endpoint)
+- `/health` — Health check endpoint (returns `OK` and version if healthy)
+- `/version` — JSON response with exporter version information
+- `/debug` — JSON response with internal state for troubleshooting
+
+**Example:**
+```bash
+# Health check
+curl http://localhost:9100/health
+# OK
+# version=0.2.0
+
+# Version info
+curl http://localhost:9100/version
+# {
+#   "version": "0.2.0",
+#   "exporter": "avalonhome-prometheus-exporter"
+# }
+
+# Debug information
+curl http://localhost:9100/debug | jq
+```
+
+---
+
 ## Prometheus Configuration Example
 
 ```yaml
@@ -331,6 +405,16 @@ A prebuilt Grafana dashboard is included in the repository and supports:
 
 ---
 
+## 📚 Documentation
+
+Additional documentation is available:
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — Production deployment guide with Docker, systemd, performance tuning, and monitoring recommendations
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — Troubleshooting guide for common issues, error types, and debugging techniques
+- **[FIELDS-README.md](FIELDS-README.md)** — Detailed reference for raw miner API fields and how they map to Prometheus metrics
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -341,11 +425,13 @@ avalonhome-prometheus-exporter/
 │   └── avalonhome-miner-dashboard.json
 ├── .env.example
 ├── CHANGELOG.md
+├── DEPLOYMENT.md
 ├── docker-compose.yml
 ├── Dockerfile
 ├── FIELDS-README.md
 ├── LICENSE
-└── README.md
+├── README.md
+└── TROUBLESHOOTING.md
 ```
 
 ---

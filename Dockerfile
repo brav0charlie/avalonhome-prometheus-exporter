@@ -2,8 +2,8 @@ FROM python:3.12-alpine
 
 WORKDIR /app
 
-# Create non-root user/group
-RUN addgroup -S app && adduser -S -G app app
+# Create non-root user/group with specific IDs (UID/GID 1000)
+RUN addgroup -g 1000 app && adduser -u 1000 -G app -D app
 
 # Copy app (and ensure ownership)
 COPY app/exporter.py /app/exporter.py
@@ -12,8 +12,8 @@ RUN chown -R app:app /app
 # Make logs unbuffered and avoid writing .pyc files
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    AVALON3_PORT=4028 \
-    UPDATE_INTERVAL=10 \
+    AVALON_PORT=4028 \
+    UPDATE_INTERVAL=15 \
     EXPORTER_PORT=9100
 
 EXPOSE 9100
