@@ -28,6 +28,8 @@ __version__ = "0.2.0"
 
 # Socket buffer size for reading miner responses
 SOCKET_BUFFER_SIZE = 4096
+# Maximum response size from miner (1 MB) to prevent OOM from misbehaving firmware
+MAX_RESPONSE_SIZE = 1 * 1024 * 1024
 # Voltage conversion: raw int (e.g., 303) -> volts (3.03)
 VOLTAGE_DIVISOR = 100.0
 # Health check multiplier: poller is unhealthy if heartbeat is older than this
@@ -210,10 +212,14 @@ def query_miner(host: str, port: int, cmd: str, timeout: float = MINER_TIMEOUT) 
             s.sendall(cmd.encode("ascii"))  # no newline
             s.shutdown(socket.SHUT_WR)
             chunks: list[bytes] = []
+            total = 0
             while True:
                 data = s.recv(SOCKET_BUFFER_SIZE)
                 if not data:
                     break
+                total += len(data)
+                if total > MAX_RESPONSE_SIZE:
+                    raise ValueError(f"Response from {host}:{port} exceeded {MAX_RESPONSE_SIZE} bytes, truncating")
                 chunks.append(data)
             return b"".join(chunks).decode("ascii", errors="replace")
     except socket.timeout as e:
@@ -461,11 +467,15 @@ def _format_prometheus_labels(ip: str, labels: dict[str, str]) -> str:
     Returns:
         Formatted label string for Prometheus metric
     """
-    label_parts = [f'ip="{ip}"']
+    label_parts = [f'ip="{_escape_label_value(ip)}"']
     for k, v in labels.items():
-        v_str = str(v).replace('"', "'")
-        label_parts.append(f'{k}="{v_str}"')
+        label_parts.append(f'{k}="{_escape_label_value(str(v))}"')
     return ",".join(label_parts)
+
+
+def _escape_label_value(v: str) -> str:
+    """Escape a string for use as a Prometheus label value."""
+    return v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
     """
@@ -936,20 +946,25 @@ def poller_loop():
             thread = threading.Thread(
                 target=scrape_single_miner,
                 args=(tinfo,),
-                name=f"scraper-{tinfo['ip']}"
+                name=f"scraper-{tinfo['ip']}",
+                daemon=True,
             )
             thread.start()
             threads.append(thread)
-        
+
         # Wait for all scrapes to complete
+        join_deadline = MINER_TIMEOUT * 2
         for thread in threads:
-            thread.join(timeout=MINER_TIMEOUT * 2)  # Allow extra time for slow miners
-        
+            thread.join(timeout=join_deadline)
+            if thread.is_alive():
+                logger.warning(f"Scraper thread {thread.name} did not finish within {join_deadline}s")
+
         loop_duration = time.time() - loop_start
         logger.debug(f"Completed scrape cycle for {len(TARGETS)} miner(s) in {loop_duration:.3f}s")
 
         if not shutdown_requested.is_set():
-            time.sleep(UPDATE_INTERVAL)
+            sleep_remaining = max(0.0, UPDATE_INTERVAL - loop_duration)
+            shutdown_requested.wait(timeout=sleep_remaining)
     
     logger.info("Poller loop stopped (shutdown requested)")
 
