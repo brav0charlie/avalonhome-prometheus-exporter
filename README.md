@@ -1,6 +1,6 @@
 # avalonhome-prometheus-exporter
 
-⚠️ IMPORTANT NOTE: I vibe-coded the shit out of this on ChatGPT.
+⚠️ IMPORTANT NOTE: I vibe-coded the shit out of this on ChatGPT & Claude.
 
 A lightweight, zero-dependency Prometheus exporter for **Avalon Home-series ASIC miners**, including:
 
