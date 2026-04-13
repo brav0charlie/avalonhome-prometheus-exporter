@@ -221,7 +221,13 @@ def query_miner(host: str, port: int, cmd: str, timeout: float = MINER_TIMEOUT) 
                 if total > MAX_RESPONSE_SIZE:
                     raise ValueError(f"Response from {host}:{port} exceeded {MAX_RESPONSE_SIZE} bytes, truncating")
                 chunks.append(data)
-            return b"".join(chunks).decode("ascii", errors="replace")
+                # CGMiner API responses are NUL-terminated; stop reading
+                # once we see \0 so we don't block waiting for the miner
+                # to close the connection (which some firmware never does).
+                if b"\x00" in data:
+                    break
+            raw = b"".join(chunks)
+            return raw.replace(b"\x00", b"").decode("ascii", errors="replace")
     except socket.timeout as e:
         raise socket.timeout(f"Timeout connecting to {host}:{port} after {timeout}s") from e
     except ConnectionRefusedError as e:
