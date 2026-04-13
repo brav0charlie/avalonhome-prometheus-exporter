@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [v0.3.0] - 2026-04-13
+
+### Added
+- `# HELP` and `# TYPE` annotations for all Prometheus metrics (full `promtool check metrics` compatibility)
+- `Content-Length` header on `/metrics` responses
+- `/debug` endpoint gated behind `ENABLE_DEBUG_ENDPOINT` env var (returns 403 when disabled)
+- Query-parameter stripping on incoming HTTP paths (prevents 404 on `/metrics?...`)
+- Real hostname/IP validation at startup (`socket.inet_aton`, `inet_pton`, RFC-compliant regex)
+- Deferred target-list construction via `build_targets()` (module is importable without env vars)
+- Label-value truncation to 128 characters to bound cardinality
+- Persistent `ThreadPoolExecutor` for parallel miner scraping (replaces per-cycle thread creation)
+
+### Changed
+- Replaced per-field regex searches with single-pass `parse_all_bracket()` / `parse_all_kv()` for O(1) field lookups
+- Eliminated inner-function closures in `_parse_pool_metrics()` for reduced per-call overhead
+- Heartbeat write in poller now protected by `metrics_lock`
+- Removed dead `miner_up` fallback code from `handle_metrics()`
+
+### Fixed
+- CGMiner recv loop now breaks on NUL byte instead of waiting for EOF (fixes container hang on first poll)
+
+[v0.3.0]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.3.0
+
 ## [v0.2.0] - 2025-12-28
 
 ### Added

@@ -13,14 +13,16 @@ import json
 import logging
 import signal
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import TypedDict
+from urllib.parse import urlparse
 
 # ======================
 # Version
 # ======================
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # ======================
 # Constants
@@ -36,6 +38,8 @@ VOLTAGE_DIVISOR = 100.0
 HEALTH_CHECK_MULTIPLIER = 3.0
 # Minimum health check threshold (seconds)
 MIN_HEALTH_CHECK_THRESHOLD = 30.0
+# Maximum length for Prometheus label values (bytes after escaping)
+MAX_LABEL_VALUE_LENGTH = 128
 
 # ======================
 # Configuration
@@ -55,6 +59,9 @@ MINER_TIMEOUT = float(os.getenv("MINER_TIMEOUT", "5.0"))
 
 # Optional: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# Optional: Enable /debug endpoint (disabled by default for security)
+ENABLE_DEBUG_ENDPOINT = os.getenv("ENABLE_DEBUG_ENDPOINT", "0").lower() in ("1", "true", "yes", "on")
 
 # One-shot combined command (single TCP request)
 COMBINED_CMD = "version+summary+stats+config+devs+devdetails+pools"
@@ -90,6 +97,118 @@ class ChipData(TypedDict):
     metrics: dict[str, float]
 
 # ======================
+# Metric Metadata (HELP/TYPE for Prometheus exposition)
+# ======================
+
+# (type, help) for every miner-level metric emitted by _parse_miner_metrics / _parse_chip_metrics
+MINER_METRIC_META: dict[str, tuple[str, str]] = {
+    # Uptime
+    "avalon_uptime_seconds":                ("gauge", "Seconds since cgminer started (from summary Elapsed)."),
+    # Work mode & binary flags
+    "avalon_work_mode":                     ("gauge", "Firmware work mode (implementation-defined)."),
+    "avalon_activation":                    ("gauge", "Whether hashing is active (0/1)."),
+    "avalon_soft_power_off":                ("gauge", "Software-triggered power-off state (0/1)."),
+    "avalon_lcd_on":                        ("gauge", "LCD enabled (0/1)."),
+    "avalon_lcd_switch":                    ("gauge", "LCD switching enabled (0/1)."),
+    # Temperatures
+    "avalon_temp_inlet_celsius":            ("gauge", "Inlet/intake temperature in Celsius (may be -273 on some firmware)."),
+    "avalon_temp_outlet_celsius":           ("gauge", "Outlet/exhaust temperature in Celsius."),
+    "avalon_temp_avg_celsius":              ("gauge", "Average ASIC temperature in Celsius."),
+    "avalon_temp_max_celsius":              ("gauge", "Maximum observed ASIC temperature in Celsius."),
+    "avalon_temp_target_celsius":           ("gauge", "Target temperature used by the control loop in Celsius."),
+    # ASIC topology
+    "avalon_total_asics":                   ("gauge", "Total number of ASICs present."),
+    # Fans
+    "avalon_fan1_rpm":                      ("gauge", "Primary fan speed in RPM."),
+    "avalon_fan_duty_percent":              ("gauge", "Fan duty cycle percentage."),
+    # Hashrate & performance
+    "avalon_hashrate_ghs":                  ("gauge", "Instantaneous hashrate in GH/s."),
+    "avalon_hashrate_moving_ghs":           ("gauge", "Moving/medium-window average hashrate in GH/s."),
+    "avalon_hashrate_avg_ghs":              ("gauge", "Longer-term average hashrate in GH/s."),
+    "avalon_work_utility":                  ("gauge", "Work utility from stats."),
+    "avalon_frequency_mhz":                 ("gauge", "Configured ASIC frequency in MHz."),
+    # Error & reliability
+    "avalon_hw_errors_total":               ("counter", "Hardware error count."),
+    "avalon_hw_error_rate_percent":         ("gauge", "Hardware error rate percentage (DH)."),
+    "avalon_hw_error_rate_speed_percent":   ("gauge", "Hardware error rate speed percentage (DHspd)."),
+    # Miner meta
+    "avalon_mm_count":                      ("gauge", "Number of MM modules reported."),
+    "avalon_nonce_mask":                    ("gauge", "Nonce mask value used by firmware."),
+    # Power / PSU
+    "avalon_mpo_target":                    ("gauge", "Miner power output target setting."),
+    "avalon_power_err":                     ("gauge", "PS error/status field (PS slot 0)."),
+    "avalon_power_vout":                    ("gauge", "Output voltage (PS slot 2, firmware-scaled)."),
+    "avalon_power_iout":                    ("gauge", "Output current (PS slot 3, firmware-scaled)."),
+    "avalon_power_vout_cmd":                ("gauge", "Commanded output voltage (PS slot 5)."),
+    "avalon_power_pout_wall":               ("gauge", "Wall-side input power (PS slot 6, firmware-defined)."),
+    # Summary shares & session stats
+    "avalon_shares_accepted_total":         ("counter", "Total accepted shares (session)."),
+    "avalon_shares_rejected_total":         ("counter", "Total rejected shares (session)."),
+    "avalon_shares_stale_total":            ("counter", "Total stale shares (session)."),
+    "avalon_blocks_found_total":            ("counter", "Total blocks found (session)."),
+    "avalon_best_share":                    ("gauge", "Best share value seen (session)."),
+    "avalon_device_hw_error_percent":       ("gauge", "Device hardware error percentage (session)."),
+    "avalon_device_rejected_percent":       ("gauge", "Device rejected percentage (session)."),
+    "avalon_pool_rejected_percent":         ("gauge", "Pool rejected share percentage."),
+    "avalon_pool_stale_percent":            ("gauge", "Pool stale share percentage."),
+    "avalon_work_utility_summary":          ("gauge", "Work utility from summary."),
+    # Chip aggregates
+    "avalon_chip_count":                    ("gauge", "Number of chips detected across PVT_T0/PVT_V0/MW0."),
+    "avalon_chip_temp_min_celsius":         ("gauge", "Minimum per-chip temperature in Celsius."),
+    "avalon_chip_temp_avg_celsius":         ("gauge", "Average per-chip temperature in Celsius."),
+    "avalon_chip_temp_max_celsius":         ("gauge", "Maximum per-chip temperature in Celsius."),
+    "avalon_chip_voltage_min_volts":        ("gauge", "Minimum per-chip voltage in volts."),
+    "avalon_chip_voltage_avg_volts":        ("gauge", "Average per-chip voltage in volts."),
+    "avalon_chip_voltage_max_volts":        ("gauge", "Maximum per-chip voltage in volts."),
+    "avalon_chip_matching_work_min":        ("gauge", "Minimum per-chip matching work count."),
+    "avalon_chip_matching_work_avg":        ("gauge", "Average per-chip matching work count."),
+    "avalon_chip_matching_work_max":        ("gauge", "Maximum per-chip matching work count."),
+    "avalon_chip_matching_work_sum":        ("gauge", "Sum of all per-chip matching work counts."),
+}
+
+# (type, help) for every pool-level metric emitted by _parse_pool_metrics
+POOL_METRIC_META: dict[str, tuple[str, str]] = {
+    "avalon_pool_up":                       ("gauge", "Pool is alive and stratum is active (0/1)."),
+    "avalon_pool_getworks_total":           ("counter", "Total getwork requests to pool."),
+    "avalon_pool_works_total":              ("counter", "Total work items from pool."),
+    "avalon_pool_discarded_total":          ("counter", "Total discarded work items."),
+    "avalon_pool_stale_total":              ("counter", "Total stale shares submitted to pool."),
+    "avalon_pool_bad_work_total":           ("counter", "Total bad work items from pool."),
+    "avalon_pool_get_failures_total":       ("counter", "Total getwork failures."),
+    "avalon_pool_remote_failures_total":    ("counter", "Total remote failures."),
+    "avalon_pool_shares_accepted_total":    ("counter", "Total accepted shares for this pool."),
+    "avalon_pool_shares_rejected_total":    ("counter", "Total rejected shares for this pool."),
+    "avalon_pool_diff1_shares_total":       ("counter", "Total difficulty-1 shares."),
+    "avalon_pool_difficulty_accepted":      ("gauge", "Cumulative difficulty of accepted shares."),
+    "avalon_pool_difficulty_rejected":      ("gauge", "Cumulative difficulty of rejected shares."),
+    "avalon_pool_difficulty_stale":         ("gauge", "Cumulative difficulty of stale shares."),
+    "avalon_pool_last_share_difficulty":    ("gauge", "Difficulty of the last submitted share."),
+    "avalon_pool_work_difficulty":          ("gauge", "Current work difficulty."),
+    "avalon_pool_stratum_difficulty":       ("gauge", "Current stratum difficulty."),
+    "avalon_pool_best_share":              ("gauge", "Best share value for this pool."),
+    "avalon_pool_rejected_percent":         ("gauge", "Pool rejected share percentage."),
+    "avalon_pool_stale_percent":            ("gauge", "Pool stale share percentage."),
+    "avalon_pool_current_block_height":     ("gauge", "Current block height reported by pool."),
+    "avalon_pool_current_block_version":    ("gauge", "Current block version reported by pool."),
+    "avalon_pool_last_share_time":          ("gauge", "Unix timestamp of last share submission."),
+    "avalon_pool_times_sent_total":         ("counter", "Total times data sent to pool."),
+    "avalon_pool_times_recv_total":         ("counter", "Total times data received from pool."),
+    "avalon_pool_bytes_sent_total":         ("counter", "Total bytes sent to pool."),
+    "avalon_pool_bytes_recv_total":         ("counter", "Total bytes received from pool."),
+    "avalon_pool_net_bytes_sent_total":     ("counter", "Total net bytes sent to pool."),
+    "avalon_pool_net_bytes_recv_total":     ("counter", "Total net bytes received from pool."),
+    "avalon_pool_work_diff":               ("gauge", "Current work diff from stats."),
+    "avalon_pool_min_diff":                ("gauge", "Minimum difficulty seen."),
+    "avalon_pool_max_diff":                ("gauge", "Maximum difficulty seen."),
+    "avalon_pool_min_diff_count":           ("counter", "Count of minimum difficulty work items."),
+    "avalon_pool_max_diff_count":           ("counter", "Count of maximum difficulty work items."),
+    "avalon_pool_work_had_roll_time":       ("gauge", "Work had roll time flag (0/1)."),
+    "avalon_pool_work_can_roll":            ("gauge", "Work can roll flag (0/1)."),
+    "avalon_pool_work_had_expire":          ("gauge", "Work had expire flag (0/1)."),
+    "avalon_pool_work_roll_time_seconds":   ("gauge", "Work roll time in seconds."),
+}
+
+# ======================
 # Configuration Validation
 # ======================
 
@@ -114,36 +233,58 @@ def validate_configuration() -> None:
 
 def validate_hostname(host: str) -> bool:
     """
-    Basic hostname/IP validation.
-    Returns True if hostname appears valid (non-empty, reasonable length).
+    Validate a hostname, IPv4, or IPv6 address.
+    Returns True if the input is a valid IP address or RFC-compliant hostname.
     """
     if not host or len(host) > 253:
         return False
-    # Allow hostnames, IPs, and local names
-    return True
 
-# Build target list
+    # IPv4
+    try:
+        socket.inet_aton(host)
+        return True
+    except OSError:
+        pass
+
+    # IPv6 (optionally bracket-wrapped, e.g. [::1])
+    ipv6 = host.strip("[]") if host.startswith("[") and host.endswith("]") else host
+    try:
+        socket.inet_pton(socket.AF_INET6, ipv6)
+        return True
+    except OSError:
+        pass
+
+    # Hostname: labels separated by '.', each 1-63 chars, a-zA-Z0-9 and hyphen,
+    # cannot start or end with hyphen. Single-label hostnames are valid for LAN use.
+    hostname_re = re.compile(r'^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)$')
+    labels = host.split(".")
+    return all(hostname_re.match(label) for label in labels)
+
 TARGETS: list[TargetInfo] = []
 
-if AVALON_IPS_ENV:
-    for host in AVALON_IPS_ENV.split(","):
-        host = host.strip()
-        if host:
-            if not validate_hostname(host):
-                raise SystemExit(f"Invalid hostname/IP: {host}")
-            TARGETS.append(TargetInfo(ip=host, port=MINER_PORT))
-elif SINGLE_IP_ENV:
-    if not validate_hostname(SINGLE_IP_ENV):
-        raise SystemExit(f"Invalid hostname/IP: {SINGLE_IP_ENV}")
-    TARGETS.append(TargetInfo(ip=SINGLE_IP_ENV, port=MINER_PORT))
-else:
-    raise SystemExit(
-        "You must set AVALON_IPS (comma-separated) or AVALON_IP "
-        "to tell the exporter which miner(s) to scrape."
-    )
+def build_targets() -> list[TargetInfo]:
+    """Build and validate the target miner list from environment variables."""
+    targets: list[TargetInfo] = []
 
-# Validate configuration after parsing
-validate_configuration()
+    if AVALON_IPS_ENV:
+        for host in AVALON_IPS_ENV.split(","):
+            host = host.strip()
+            if host:
+                if not validate_hostname(host):
+                    raise SystemExit(f"Invalid hostname/IP: {host}")
+                targets.append(TargetInfo(ip=host, port=MINER_PORT))
+    elif SINGLE_IP_ENV:
+        if not validate_hostname(SINGLE_IP_ENV):
+            raise SystemExit(f"Invalid hostname/IP: {SINGLE_IP_ENV}")
+        targets.append(TargetInfo(ip=SINGLE_IP_ENV, port=MINER_PORT))
+    else:
+        raise SystemExit(
+            "You must set AVALON_IPS (comma-separated) or AVALON_IP "
+            "to tell the exporter which miner(s) to scrape."
+        )
+
+    validate_configuration()
+    return targets
 
 # ======================
 # Shared state
@@ -238,6 +379,14 @@ def query_miner(host: str, port: int, cmd: str, timeout: float = MINER_TIMEOUT) 
 # ======================
 # Parsing helpers
 # ======================
+
+def parse_all_bracket(text: str) -> dict[str, str]:
+    """Extract all KEY[value] pairs from text into a dict in a single regex pass."""
+    return {k: v.strip() for k, v in re.findall(r'(\w+)\[([^\]]*)\]', text)}
+
+def parse_all_kv(text: str) -> dict[str, str]:
+    """Extract all key=value pairs (value terminated by comma or pipe) in a single regex pass."""
+    return {k.strip(): v.strip() for k, v in re.findall(r'([\w][^=,|]*?)=([^,|]+)', text)}
 
 def find_bracket(key: str, text: str, default: str = "N/A") -> str:
     """Find KEY[...] style values in a blob, e.g. WORKMODE[2] -> '2'."""
@@ -481,7 +630,10 @@ def _format_prometheus_labels(ip: str, labels: dict[str, str]) -> str:
 
 def _escape_label_value(v: str) -> str:
     """Escape a string for use as a Prometheus label value."""
-    return v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    escaped = v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    if len(escaped) > MAX_LABEL_VALUE_LENGTH:
+        escaped = escaped[:MAX_LABEL_VALUE_LENGTH]
+    return escaped
 
 def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
     """
@@ -495,91 +647,96 @@ def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
         Dictionary of metric names to float values
     """
     metrics: dict[str, float] = {}
-    
+
+    # Pre-parse stats0 into dicts for O(1) lookups instead of repeated regex scans
+    bracket = parse_all_bracket(stats0)
+    stats0_kv = parse_all_kv(stats0)
+    summary_kv = parse_all_kv(summary_section)
+
     # Uptime: prefer summary Elapsed, fallback stats0 Elapsed
-    elapsed = find_kv("Elapsed", summary_section, default="0")
+    elapsed = summary_kv.get("Elapsed", "0")
     if elapsed == "0":
-        elapsed = find_kv("Elapsed", stats0, default="0")
+        elapsed = stats0_kv.get("Elapsed", "0")
     metrics["avalon_uptime_seconds"] = parse_float(elapsed) or 0.0
-    
+
     # Work mode & binary flags
-    wm = workmode_numeric(find_bracket("WORKMODE", stats0, default=""))
+    wm = workmode_numeric(bracket.get("WORKMODE", ""))
     if wm is not None:
         metrics["avalon_work_mode"] = float(wm)
-    
-    metrics["avalon_activation"] = on_off_numeric(find_bracket("Activation", stats0, default="0"))
-    metrics["avalon_soft_power_off"] = on_off_numeric(find_bracket("SoftOFF", stats0, default="0"))
-    metrics["avalon_lcd_on"] = on_off_numeric(find_bracket("LcdOnoff", stats0, default="0"))
-    metrics["avalon_lcd_switch"] = on_off_numeric(find_bracket("LcdSwitch", stats0, default="0"))
-    
+
+    metrics["avalon_activation"] = on_off_numeric(bracket.get("Activation", "0"))
+    metrics["avalon_soft_power_off"] = on_off_numeric(bracket.get("SoftOFF", "0"))
+    metrics["avalon_lcd_on"] = on_off_numeric(bracket.get("LcdOnoff", "0"))
+    metrics["avalon_lcd_switch"] = on_off_numeric(bracket.get("LcdSwitch", "0"))
+
     # Temps (report ITemp as-is, even if -273)
     for key, val in [
-        ("avalon_temp_inlet_celsius", find_bracket("ITemp", stats0, default="N/A")),
-        ("avalon_temp_outlet_celsius", find_bracket("OTemp", stats0, default="N/A")),
-        ("avalon_temp_avg_celsius", find_bracket("TAvg", stats0, default="N/A")),
-        ("avalon_temp_max_celsius", find_bracket("TMax", stats0, default="N/A")),
-        ("avalon_temp_target_celsius", find_bracket("TarT", stats0, default="N/A")),
+        ("avalon_temp_inlet_celsius", bracket.get("ITemp", "N/A")),
+        ("avalon_temp_outlet_celsius", bracket.get("OTemp", "N/A")),
+        ("avalon_temp_avg_celsius", bracket.get("TAvg", "N/A")),
+        ("avalon_temp_max_celsius", bracket.get("TMax", "N/A")),
+        ("avalon_temp_target_celsius", bracket.get("TarT", "N/A")),
     ]:
         f = parse_float(val)
         if f is not None:
             metrics[key] = f
-    
+
     # TA = Total ASICs (NOT ambient temperature)
-    total_asics = parse_int(find_bracket("TA", stats0, default="N/A"))
+    total_asics = parse_int(bracket.get("TA", "N/A"))
     if total_asics is not None:
         metrics["avalon_total_asics"] = float(total_asics)
-    
+
     # Fans
-    f_fan1 = parse_float(find_bracket("Fan1", stats0, default="N/A"))
+    f_fan1 = parse_float(bracket.get("Fan1", "N/A"))
     if f_fan1 is not None:
         metrics["avalon_fan1_rpm"] = f_fan1
-    f_fanr = parse_float(find_bracket("FanR", stats0, default="N/A"))
+    f_fanr = parse_float(bracket.get("FanR", "N/A"))
     if f_fanr is not None:
         metrics["avalon_fan_duty_percent"] = f_fanr
-    
+
     # Hashrate & WU
     for key, val in [
-        ("avalon_hashrate_ghs", find_bracket("GHSspd", stats0, default="N/A")),
-        ("avalon_hashrate_moving_ghs", find_bracket("GHSmm", stats0, default="N/A")),
-        ("avalon_hashrate_avg_ghs", find_bracket("GHSavg", stats0, default="N/A")),
-        ("avalon_work_utility", find_bracket("WU", stats0, default="N/A")),
-        ("avalon_frequency_mhz", find_bracket("Freq", stats0, default="N/A")),
+        ("avalon_hashrate_ghs", bracket.get("GHSspd", "N/A")),
+        ("avalon_hashrate_moving_ghs", bracket.get("GHSmm", "N/A")),
+        ("avalon_hashrate_avg_ghs", bracket.get("GHSavg", "N/A")),
+        ("avalon_work_utility", bracket.get("WU", "N/A")),
+        ("avalon_frequency_mhz", bracket.get("Freq", "N/A")),
     ]:
         f = parse_float(val)
         if f is not None:
             metrics[key] = f
-    
-    f_dh = parse_float(find_bracket("DH", stats0, default="N/A"))
+
+    f_dh = parse_float(bracket.get("DH", "N/A"))
     if f_dh is not None:
         metrics["avalon_hw_error_rate_percent"] = f_dh
-    
-    f_dhspd = parse_float(find_bracket("DHspd", stats0, default="N/A"))
+
+    f_dhspd = parse_float(bracket.get("DHspd", "N/A"))
     if f_dhspd is not None:
         metrics["avalon_hw_error_rate_speed_percent"] = f_dhspd
-    
-    i_hw = parse_int(find_bracket("HW", stats0, default="N/A"))
+
+    i_hw = parse_int(bracket.get("HW", "N/A"))
     if i_hw is not None:
         metrics["avalon_hw_errors_total"] = float(i_hw)
-    
+
     # MPO (target power consumption) - numeric, unit as reported by firmware
-    mpo = parse_float(find_bracket("MPO", stats0, default="N/A"))
+    mpo = parse_float(bracket.get("MPO", "N/A"))
     if mpo is not None:
         metrics["avalon_mpo_target"] = mpo
-    
+
     # MM Count / Nonce Mask (if present)
-    mm_count = parse_int(find_kv("MM Count", stats0, default="N/A"))
+    mm_count = parse_int(stats0_kv.get("MM Count", "N/A"))
     if mm_count is not None:
         metrics["avalon_mm_count"] = float(mm_count)
-    
-    nonce_mask = parse_int(find_kv("Nonce Mask", stats0, default="N/A"))
+
+    nonce_mask = parse_int(stats0_kv.get("Nonce Mask", "N/A"))
     if nonce_mask is not None:
         metrics["avalon_nonce_mask"] = float(nonce_mask)
-    
+
     # Power PS[...] (export named fields + raw slots)
-    ps_vals = parse_ps_list(find_bracket("PS", stats0, default="N/A"))
+    ps_vals = parse_ps_list(bracket.get("PS", "N/A"))
     for idx, v in enumerate(ps_vals):
         metrics[f"avalon_ps_slot_{idx}"] = float(v)
-    
+
     # Named slots (Nano3s driver-avalon.c semantics)
     # index: 0=err, 2=vout, 3=iout, 5=voutcmd, 6=poutwall
     if len(ps_vals) > 0:
@@ -592,30 +749,30 @@ def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
         metrics["avalon_power_vout_cmd"] = float(ps_vals[5])
     if len(ps_vals) > 6:
         metrics["avalon_power_pout_wall"] = float(ps_vals[6])
-    
+
     # Shares / pool stats from summary
     for key, val in [
-        ("avalon_shares_accepted_total", find_kv("Accepted", summary_section, default="N/A")),
-        ("avalon_shares_rejected_total", find_kv("Rejected", summary_section, default="N/A")),
-        ("avalon_shares_stale_total", find_kv("Stale", summary_section, default="N/A")),
-        ("avalon_blocks_found_total", find_kv("Found Blocks", summary_section, default="N/A")),
-        ("avalon_best_share", find_kv("Best Share", summary_section, default="N/A")),
+        ("avalon_shares_accepted_total", summary_kv.get("Accepted", "N/A")),
+        ("avalon_shares_rejected_total", summary_kv.get("Rejected", "N/A")),
+        ("avalon_shares_stale_total", summary_kv.get("Stale", "N/A")),
+        ("avalon_blocks_found_total", summary_kv.get("Found Blocks", "N/A")),
+        ("avalon_best_share", summary_kv.get("Best Share", "N/A")),
     ]:
         v = parse_float(val)
         if v is not None:
             metrics[key] = v
-    
+
     for key, val in [
-        ("avalon_device_hw_error_percent", find_kv("Device Hardware%", summary_section, default="N/A")),
-        ("avalon_device_rejected_percent", find_kv("Device Rejected%", summary_section, default="N/A")),
-        ("avalon_pool_rejected_percent", find_kv("Pool Rejected%", summary_section, default="N/A")),
-        ("avalon_pool_stale_percent", find_kv("Pool Stale%", summary_section, default="N/A")),
-        ("avalon_work_utility_summary", find_kv("Work Utility", summary_section, default="N/A")),
+        ("avalon_device_hw_error_percent", summary_kv.get("Device Hardware%", "N/A")),
+        ("avalon_device_rejected_percent", summary_kv.get("Device Rejected%", "N/A")),
+        ("avalon_pool_rejected_percent", summary_kv.get("Pool Rejected%", "N/A")),
+        ("avalon_pool_stale_percent", summary_kv.get("Pool Stale%", "N/A")),
+        ("avalon_work_utility_summary", summary_kv.get("Work Utility", "N/A")),
     ]:
         f = parse_float(val)
         if f is not None:
             metrics[key] = f
-    
+
     return metrics
 
 def _parse_chip_metrics(stats0: str) -> tuple[dict[str, float], list[ChipData]]:
@@ -630,11 +787,14 @@ def _parse_chip_metrics(stats0: str) -> tuple[dict[str, float], list[ChipData]]:
     """
     metrics: dict[str, float] = {}
     chips: list[ChipData] = []
-    
+
+    # Pre-parse stats0 for O(1) lookups
+    bracket = parse_all_bracket(stats0)
+
     # Chip temps (PVT_T0), voltages (PVT_V0), chip matching-work telemetry (MW0)
-    chip_t_raw = find_bracket("PVT_T0", stats0, default="N/A")
-    chip_v_raw = find_bracket("PVT_V0", stats0, default="N/A")
-    chip_mw_raw = find_bracket("MW0", stats0, default="N/A")
+    chip_t_raw = bracket.get("PVT_T0", "N/A")
+    chip_v_raw = bracket.get("PVT_V0", "N/A")
+    chip_mw_raw = bracket.get("MW0", "N/A")
     
     chip_t = parse_int_list(chip_t_raw) if chip_t_raw != "N/A" else []
     chip_v_ints = parse_int_list(chip_v_raw) if chip_v_raw != "N/A" else []
@@ -718,9 +878,6 @@ def _parse_pool_metrics(pools_section: str, stats_section: str) -> list[PoolData
         stratum_ok = stratum_active.strip().lower() == "true"
         pool_up = 1.0 if (status_ok and stratum_ok) else 0.0
         
-        def pf(key: str) -> float | None:
-            return parse_float(pool_kv.get(key, "N/A"))
-        
         pool_metrics: dict[str, float] = {"avalon_pool_up": pool_up}
         for name, key in [
             ("avalon_pool_getworks_total", "Getworks"),
@@ -746,7 +903,7 @@ def _parse_pool_metrics(pools_section: str, stats_section: str) -> list[PoolData
             ("avalon_pool_current_block_version", "Current Block Version"),
             ("avalon_pool_last_share_time", "Last Share Time"),
         ]:
-            val = pf(key)
+            val = parse_float(pool_kv.get(key, "N/A"))
             if val is not None:
                 pool_metrics[name] = val
         
@@ -774,29 +931,23 @@ def _parse_pool_metrics(pools_section: str, stats_section: str) -> list[PoolData
             }
         
         pool_map[pool_index]["labels"]["id"] = pid
-        
-        def pf_k(key: str, default: str = "N/A") -> float | None:
-            return parse_float(kv.get(key, default))
-        
-        def pb_k(key: str, default: str = "false") -> float:
-            return bool_numeric(kv.get(key, default))
-        
+
         stats_pool_metrics = {
-            "avalon_pool_times_sent_total": pf_k("Times Sent"),
-            "avalon_pool_times_recv_total": pf_k("Times Recv"),
-            "avalon_pool_bytes_sent_total": pf_k("Bytes Sent"),
-            "avalon_pool_bytes_recv_total": pf_k("Bytes Recv"),
-            "avalon_pool_net_bytes_sent_total": pf_k("Net Bytes Sent"),
-            "avalon_pool_net_bytes_recv_total": pf_k("Net Bytes Recv"),
-            "avalon_pool_work_diff": pf_k("Work Diff"),
-            "avalon_pool_min_diff": pf_k("Min Diff"),
-            "avalon_pool_max_diff": pf_k("Max Diff"),
-            "avalon_pool_min_diff_count": pf_k("Min Diff Count"),
-            "avalon_pool_max_diff_count": pf_k("Max Diff Count"),
-            "avalon_pool_work_had_roll_time": pb_k("Work Had Roll Time"),
-            "avalon_pool_work_can_roll": pb_k("Work Can Roll"),
-            "avalon_pool_work_had_expire": pb_k("Work Had Expire"),
-            "avalon_pool_work_roll_time_seconds": pf_k("Work Roll Time"),
+            "avalon_pool_times_sent_total": parse_float(kv.get("Times Sent", "N/A")),
+            "avalon_pool_times_recv_total": parse_float(kv.get("Times Recv", "N/A")),
+            "avalon_pool_bytes_sent_total": parse_float(kv.get("Bytes Sent", "N/A")),
+            "avalon_pool_bytes_recv_total": parse_float(kv.get("Bytes Recv", "N/A")),
+            "avalon_pool_net_bytes_sent_total": parse_float(kv.get("Net Bytes Sent", "N/A")),
+            "avalon_pool_net_bytes_recv_total": parse_float(kv.get("Net Bytes Recv", "N/A")),
+            "avalon_pool_work_diff": parse_float(kv.get("Work Diff", "N/A")),
+            "avalon_pool_min_diff": parse_float(kv.get("Min Diff", "N/A")),
+            "avalon_pool_max_diff": parse_float(kv.get("Max Diff", "N/A")),
+            "avalon_pool_min_diff_count": parse_float(kv.get("Min Diff Count", "N/A")),
+            "avalon_pool_max_diff_count": parse_float(kv.get("Max Diff Count", "N/A")),
+            "avalon_pool_work_had_roll_time": bool_numeric(kv.get("Work Had Roll Time", "false")),
+            "avalon_pool_work_can_roll": bool_numeric(kv.get("Work Can Roll", "false")),
+            "avalon_pool_work_had_expire": bool_numeric(kv.get("Work Had Expire", "false")),
+            "avalon_pool_work_roll_time_seconds": parse_float(kv.get("Work Roll Time", "N/A")),
         }
         
         for kname, v in stats_pool_metrics.items():
@@ -939,39 +1090,41 @@ def poller_loop():
     """Background loop that polls all miners every UPDATE_INTERVAL seconds in parallel."""
     global poller_last_heartbeat
     logger.info(f"Poller loop started, monitoring {len(TARGETS)} miner(s) in parallel")
-    
-    while not shutdown_requested.is_set():
-        poller_last_heartbeat = time.time()
-        loop_start = time.time()
-        
-        # Scrape all miners in parallel using threads
-        threads: list[threading.Thread] = []
-        for tinfo in TARGETS:
-            if shutdown_requested.is_set():
-                break
-            thread = threading.Thread(
-                target=scrape_single_miner,
-                args=(tinfo,),
-                name=f"scraper-{tinfo['ip']}",
-                daemon=True,
-            )
-            thread.start()
-            threads.append(thread)
 
-        # Wait for all scrapes to complete
-        join_deadline = MINER_TIMEOUT * 2
-        for thread in threads:
-            thread.join(timeout=join_deadline)
-            if thread.is_alive():
-                logger.warning(f"Scraper thread {thread.name} did not finish within {join_deadline}s")
+    executor = ThreadPoolExecutor(max_workers=min(len(TARGETS), 32))
+    try:
+        while not shutdown_requested.is_set():
+            with metrics_lock:
+                poller_last_heartbeat = time.time()
+            loop_start = time.time()
 
-        loop_duration = time.time() - loop_start
-        logger.debug(f"Completed scrape cycle for {len(TARGETS)} miner(s) in {loop_duration:.3f}s")
+            # Scrape all miners in parallel
+            futures = {}
+            for tinfo in TARGETS:
+                if shutdown_requested.is_set():
+                    break
+                future = executor.submit(scrape_single_miner, tinfo)
+                futures[future] = tinfo
 
-        if not shutdown_requested.is_set():
-            sleep_remaining = max(0.0, UPDATE_INTERVAL - loop_duration)
-            shutdown_requested.wait(timeout=sleep_remaining)
-    
+            # Wait for all scrapes to complete
+            join_deadline = MINER_TIMEOUT * 2
+            try:
+                for future in as_completed(futures, timeout=join_deadline):
+                    pass  # scrape_single_miner handles its own results/errors
+            except TimeoutError:
+                timed_out = [str(futures[f]["ip"]) for f in futures if not f.done()]
+                if timed_out:
+                    logger.warning(f"Scraper(s) did not finish within {join_deadline}s: {', '.join(timed_out)}")
+
+            loop_duration = time.time() - loop_start
+            logger.debug(f"Completed scrape cycle for {len(TARGETS)} miner(s) in {loop_duration:.3f}s")
+
+            if not shutdown_requested.is_set():
+                sleep_remaining = max(0.0, UPDATE_INTERVAL - loop_duration)
+                shutdown_requested.wait(timeout=sleep_remaining)
+    finally:
+        executor.shutdown(wait=False)
+
     logger.info("Poller loop stopped (shutdown requested)")
 
 # ======================
@@ -980,14 +1133,21 @@ def poller_loop():
 
 class AvalonHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/metrics":
+        parsed_path = urlparse(self.path).path
+        if parsed_path == "/metrics":
             self.handle_metrics()
-        elif self.path == "/health" or self.path == "/":
+        elif parsed_path == "/health" or parsed_path == "/":
             self.handle_health()
-        elif self.path == "/version":
+        elif parsed_path == "/version":
             self.handle_version()
-        elif self.path == "/debug":
-            self.handle_debug()
+        elif parsed_path == "/debug":
+            if ENABLE_DEBUG_ENDPOINT:
+                self.handle_debug()
+            else:
+                self.send_response(403)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Debug endpoint is disabled. Set ENABLE_DEBUG_ENDPOINT=true to enable.\n")
         else:
             self.send_response(404)
             self.end_headers()
@@ -1004,7 +1164,8 @@ class AvalonHandler(BaseHTTPRequestHandler):
         NOT "all miners are up"
         """
         now = time.time()
-        hb = poller_last_heartbeat
+        with metrics_lock:
+            hb = poller_last_heartbeat
         unhealthy = (hb == 0.0) or ((now - hb) > max(MIN_HEALTH_CHECK_THRESHOLD, UPDATE_INTERVAL * HEALTH_CHECK_MULTIPLIER))
         self.send_response(503 if unhealthy else 200)
         self.send_header("Content-Type", "text/plain")
@@ -1129,8 +1290,6 @@ class AvalonHandler(BaseHTTPRequestHandler):
             updated = updates_snapshot.get(ip, 0.0)
             err = errors_snapshot.get(ip)
             up_val = miner_up_snapshot.get(ip, 0.0)
-            if ip not in miner_up_snapshot:
-                up_val = 1.0 if (err is None and (now - updated) < UPDATE_INTERVAL * 3) else 0.0
 
             if up_val == 0.0 and updated > 0.0:
                 down_for = now - updated
@@ -1164,10 +1323,22 @@ class AvalonHandler(BaseHTTPRequestHandler):
             lines.append(f'avalon_status_ups_total{{ip="{ip}"}} {status_ups}')
             lines.append(f'avalon_status_downs_total{{ip="{ip}"}} {status_downs}')
 
-        # Miner-level metrics
-        for ip, metrics_for_ip in sorted(metrics_snapshot.items()):
-            for name, val in sorted(metrics_for_ip.items()):
-                lines.append(f'{name}{{ip="{ip}"}} {val}')
+        # Miner-level metrics — emit HELP/TYPE once per metric name, then values
+        all_miner_metric_names: set[str] = set()
+        for metrics_for_ip in metrics_snapshot.values():
+            all_miner_metric_names.update(metrics_for_ip.keys())
+        for name in sorted(all_miner_metric_names):
+            if name in MINER_METRIC_META:
+                mtype, mhelp = MINER_METRIC_META[name]
+                lines.append(f"# HELP {name} {mhelp}")
+                lines.append(f"# TYPE {name} {mtype}")
+            elif name.startswith("avalon_ps_slot_"):
+                lines.append(f"# HELP {name} Raw PS slot value (firmware-defined).")
+                lines.append(f"# TYPE {name} gauge")
+            for ip in sorted(metrics_snapshot):
+                val = metrics_snapshot[ip].get(name)
+                if val is not None:
+                    lines.append(f'{name}{{ip="{ip}"}} {val}')
 
         # Per-chip metrics (optional)
         if EXPORT_CHIP_METRICS:
@@ -1184,12 +1355,22 @@ class AvalonHandler(BaseHTTPRequestHandler):
                     for name, val in chip.get("metrics", {}).items():
                         lines.append(f"{name}{{{label_str}}} {val}")
 
-        # Pool-level metrics
-        for ip, pools_for_ip in sorted(pools_snapshot.items()):
+        # Pool-level metrics — emit HELP/TYPE once per metric name, then values
+        all_pool_metric_names: set[str] = set()
+        for pools_for_ip in pools_snapshot.values():
             for pool in pools_for_ip:
-                label_str = _format_prometheus_labels(ip, pool.get("labels", {}))
-                for name, val in sorted(pool.get("metrics", {}).items()):
-                    lines.append(f"{name}{{{label_str}}} {val}")
+                all_pool_metric_names.update(pool.get("metrics", {}).keys())
+        for name in sorted(all_pool_metric_names):
+            if name in POOL_METRIC_META and name not in all_miner_metric_names:
+                mtype, mhelp = POOL_METRIC_META[name]
+                lines.append(f"# HELP {name} {mhelp}")
+                lines.append(f"# TYPE {name} {mtype}")
+            for ip, pools_for_ip in sorted(pools_snapshot.items()):
+                for pool in pools_for_ip:
+                    val = pool.get("metrics", {}).get(name)
+                    if val is not None:
+                        label_str = _format_prometheus_labels(ip, pool.get("labels", {}))
+                        lines.append(f"{name}{{{label_str}}} {val}")
 
         # Static info metric
         lines.append("# HELP avalon_info Static info about the Avalon miner (model, firmware, etc).")
@@ -1199,11 +1380,12 @@ class AvalonHandler(BaseHTTPRequestHandler):
             lines.append(f'avalon_info{{{label_str}}} 1')
 
         body = "\n".join(lines) + "\n"
+        body_bytes = body.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; version=0.0.4")
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Length", str(len(body_bytes)))
         self.end_headers()
-        self.wfile.write(body.encode("utf-8"))
+        self.wfile.write(body_bytes)
 
 # ======================
 # Signal Handlers
@@ -1220,10 +1402,13 @@ def signal_handler(signum, frame):
 
 def main():
     """Main entry point for the exporter."""
+    global TARGETS
+    TARGETS = build_targets()
+
     # Register signal handlers for graceful shutdown
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
-    
+
     # Start poller thread (non-daemon so we can wait for it)
     poller_thread = threading.Thread(target=poller_loop, name="poller")
     poller_thread.start()
@@ -1234,7 +1419,8 @@ def main():
     logger.info(
         f"Avalon exporter v{__version__} listening on 0.0.0.0:{EXPORTER_PORT}, "
         f"polling {len(TARGETS)} miner(s) every {UPDATE_INTERVAL}s "
-        f"(combined cmd: {COMBINED_CMD}; export_chip_metrics={EXPORT_CHIP_METRICS})"
+        f"(combined cmd: {COMBINED_CMD}; export_chip_metrics={EXPORT_CHIP_METRICS}; "
+        f"debug_endpoint={ENABLE_DEBUG_ENDPOINT})"
     )
     for tinfo in TARGETS:
         logger.info(f"  - {tinfo['ip']}:{tinfo['port']}")
