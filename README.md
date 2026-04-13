@@ -323,7 +323,7 @@ avalon_pool_rejected_percent
 avalon_pool_stale_percent
 avalon_pool_shares_accepted_total
 avalon_pool_shares_rejected_total
-avalon_pool_shares_stale_total
+avalon_pool_stale_total
 avalon_pool_current_block_height
 ```
 
