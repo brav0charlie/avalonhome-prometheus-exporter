@@ -229,7 +229,7 @@ avalon_status_downs_total
 ### 📊 Exporter Metrics
 
 ```text
-avalon_exporter_info{version="0.3.0"} 1
+avalon_exporter_info{version="0.3.1"} 1
 ```
 
 The exporter also exposes its own version information and scrape duration metrics for monitoring exporter performance.
@@ -383,12 +383,12 @@ The exporter provides several HTTP endpoints:
 # Health check
 curl http://localhost:9100/health
 # OK
-# version=0.3.0
+# version=0.3.1
 
 # Version info
 curl http://localhost:9100/version
 # {
-#   "version": "0.3.0",
+#   "version": "0.3.1",
 #   "exporter": "avalonhome-prometheus-exporter"
 # }
 

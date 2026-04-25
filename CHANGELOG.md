@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [v0.3.1] - 2026-04-25
+
+### Fixed
+- Reject incomplete or partial CGMiner responses instead of marking malformed scrapes as successful.
+- Rename session-wide pool rejection/stale percentage metrics to `avalon_session_pool_rejected_percent` and `avalon_session_pool_stale_percent`, leaving per-pool `avalon_pool_*` metrics scoped to pool-labeled series.
+- Honor custom `EXPORTER_PORT` values in the Docker healthcheck.
+- Route invalid numeric environment values through the normal configuration validation path with clear error messages.
+- Serve HTTP requests concurrently so a slow `/metrics` or `/debug` client does not block `/health`.
+- Refresh troubleshooting commands for the current Compose service name, v0.3.x health output, and the gated `/debug` endpoint.
+
+### Notes
+- Per-pool Grafana/dashboard queries using `avalon_pool_rejected_percent` and `avalon_pool_stale_percent` do not need to change.
+- Any queries that intentionally used the session-wide unlabeled `avalon_pool_rejected_percent` or `avalon_pool_stale_percent` should switch to the new `avalon_session_pool_*` metric names.
+
+[v0.3.1]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.3.1
+
 ## [v0.3.0] - 2026-04-13
 
 ### Added
