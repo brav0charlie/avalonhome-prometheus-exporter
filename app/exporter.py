@@ -45,17 +45,37 @@ MAX_LABEL_VALUE_LENGTH = 128
 # Configuration
 # ======================
 
+CONFIG_ERRORS: list[str] = []
+
+def _parse_int_env(name: str, default: str) -> int:
+    """Parse an integer environment variable and record a validation error on failure."""
+    raw = os.getenv(name, default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        CONFIG_ERRORS.append(f"{name} must be an integer, got {raw!r}")
+        return int(default)
+
+def _parse_float_env(name: str, default: str) -> float:
+    """Parse a float environment variable and record a validation error on failure."""
+    raw = os.getenv(name, default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        CONFIG_ERRORS.append(f"{name} must be a number, got {raw!r}")
+        return float(default)
+
 AVALON_IPS_ENV = (os.getenv("AVALON_IPS", "") or "").strip()
 SINGLE_IP_ENV = (os.getenv("AVALON_IP", "") or "").strip()
-MINER_PORT = int(os.getenv("AVALON_PORT", "4028"))
-UPDATE_INTERVAL = float(os.getenv("UPDATE_INTERVAL", "10"))  # seconds
-EXPORTER_PORT = int(os.getenv("EXPORTER_PORT", "9100"))
+MINER_PORT = _parse_int_env("AVALON_PORT", "4028")
+UPDATE_INTERVAL = _parse_float_env("UPDATE_INTERVAL", "10")  # seconds
+EXPORTER_PORT = _parse_int_env("EXPORTER_PORT", "9100")
 
 # Optional: export per-chip metrics (can be a LOT of series)
 EXPORT_CHIP_METRICS = os.getenv("EXPORT_CHIP_METRICS", "0").lower() in ("1", "true", "yes", "on")
 
 # Optional: TCP timeout to miner API
-MINER_TIMEOUT = float(os.getenv("MINER_TIMEOUT", "5.0"))
+MINER_TIMEOUT = _parse_float_env("MINER_TIMEOUT", "5.0")
 
 # Optional: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -214,7 +234,7 @@ POOL_METRIC_META: dict[str, tuple[str, str]] = {
 
 def validate_configuration() -> None:
     """Validate configuration values and raise SystemExit on error."""
-    errors: list[str] = []
+    errors: list[str] = list(CONFIG_ERRORS)
     
     if UPDATE_INTERVAL <= 0:
         errors.append(f"UPDATE_INTERVAL must be > 0, got {UPDATE_INTERVAL}")
