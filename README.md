@@ -120,7 +120,7 @@ docker compose up -d
 4. Verify operation:
 
 ```bash
-docker compose logs -f avalon-exporter
+docker compose logs -f avalonhome-exporter
 ```
 
 5. Access metrics:
