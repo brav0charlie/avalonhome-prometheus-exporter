@@ -25,7 +25,7 @@ This guide helps you diagnose and resolve common issues with the Avalon Home Pro
 **Solutions:**
 1. Check environment variables are set correctly:
    ```bash
-   docker compose logs avalon-exporter
+   docker compose logs avalonhome-exporter
    ```
 2. Verify at least one of `AVALON_IP` or `AVALON_IPS` is set
 3. Ensure ports are in valid range (1-65535)
@@ -60,7 +60,7 @@ Configuration errors:
 3. Verify network connectivity between Prometheus and exporter
 4. Check exporter logs for errors:
    ```bash
-   docker compose logs -f avalon-exporter
+   docker compose logs -f avalonhome-exporter
    ```
 
 ---
@@ -75,7 +75,7 @@ Configuration errors:
 1. **Check network connectivity from container:**
    ```bash
    # Test connection from inside the container
-   docker compose exec avalon-exporter sh -c "echo -n 'version' | nc <miner-ip> 4028"
+   docker compose exec avalonhome-exporter sh -c "echo -n 'version' | nc <miner-ip> 4028"
    
    # Or if using docker run
    docker exec avalon-exporter sh -c "echo -n 'version' | nc <miner-ip> 4028"
@@ -97,13 +97,13 @@ Configuration errors:
 
 4. **Review exporter logs:**
    ```bash
-   docker compose logs avalon-exporter | grep -i error
+   docker compose logs avalonhome-exporter | grep -i error
    ```
 
 5. **Test direct connection from container:**
    ```bash
    # From inside the container
-   docker compose exec avalon-exporter sh -c "echo -n 'version' | nc <miner-ip> 4028"
+   docker compose exec avalonhome-exporter sh -c "echo -n 'version' | nc <miner-ip> 4028"
    
    # Or if using docker run
    docker exec avalon-exporter sh -c "echo -n 'version' | nc <miner-ip> 4028"
@@ -163,11 +163,11 @@ The exporter categorizes errors for better observability:
 - Verify miner is responding correctly from container:
   ```bash
   # From inside the container
-  docker compose exec avalon-exporter sh -c "echo -n 'version+summary' | nc <miner-ip> 4028"
+  docker compose exec avalonhome-exporter sh -c "echo -n 'version+summary' | nc <miner-ip> 4028"
   ```
 - Review exporter logs for specific error messages:
   ```bash
-  docker compose logs avalon-exporter | grep -i "parse\|error"
+  docker compose logs avalonhome-exporter | grep -i "parse\|error"
   ```
 
 ---
@@ -273,7 +273,7 @@ For interactive debugging, you can access the container shell:
 
 ```bash
 # Using docker compose
-docker compose exec avalon-exporter sh
+docker compose exec avalonhome-exporter sh
 
 # Using docker run
 docker exec -it avalon-exporter sh
@@ -287,14 +287,14 @@ docker exec -it avalon-exporter sh
 
 ### Using the Debug Endpoint
 
-The `/debug` endpoint provides internal state information:
+The `/debug` endpoint provides internal state information. It is disabled by default; set `ENABLE_DEBUG_ENDPOINT=true` and restart the exporter before using these commands.
 
 ```bash
 # From host (container exposes port 9100)
 curl http://localhost:9100/debug | jq
 
 # Or from inside the container
-docker compose exec avalon-exporter sh -c "wget -qO- http://localhost:9100/debug"
+docker compose exec avalonhome-exporter sh -c "wget -qO- http://localhost:9100/debug"
 ```
 
 **Response includes:**
@@ -312,7 +312,7 @@ Check exporter version:
 curl http://localhost:9100/version
 
 # Or from inside the container
-docker compose exec avalon-exporter sh -c "wget -qO- http://localhost:9100/version"
+docker compose exec avalonhome-exporter sh -c "wget -qO- http://localhost:9100/version"
 ```
 
 ### Enabling Debug Logging
@@ -335,13 +335,13 @@ LOG_LEVEL=DEBUG
 curl http://localhost:9100/health
 
 # Or from inside the container
-docker compose exec avalon-exporter sh -c "wget -qO- http://localhost:9100/health"
+docker compose exec avalonhome-exporter sh -c "wget -qO- http://localhost:9100/health"
 ```
 
 **Expected response:**
 ```
 OK
-version=0.2.0
+version=0.3.0
 ```
 
 **If unhealthy:**
@@ -374,17 +374,18 @@ If you're still experiencing issues:
 
 1. **Check the logs:**
    ```bash
-   docker compose logs avalon-exporter
+   docker compose logs avalonhome-exporter
    ```
 
 2. **Collect debug information:**
    ```bash
    # From host
+   # Requires ENABLE_DEBUG_ENDPOINT=true
    curl http://localhost:9100/debug > debug.json
    curl http://localhost:9100/metrics > metrics.txt
    
    # Or from inside container (if needed)
-   docker compose exec avalon-exporter sh -c "wget -qO- http://localhost:9100/debug" > debug.json
+   docker compose exec avalonhome-exporter sh -c "wget -qO- http://localhost:9100/debug" > debug.json
    ```
 
 3. **Review error metrics:**
@@ -396,4 +397,3 @@ If you're still experiencing issues:
    - Include relevant log excerpts
    - Include debug endpoint output (sanitize IPs if needed)
    - Describe your configuration
-

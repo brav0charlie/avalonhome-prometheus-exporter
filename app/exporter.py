@@ -14,7 +14,7 @@ import logging
 import signal
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import TypedDict
 from urllib.parse import urlparse
 
@@ -45,17 +45,37 @@ MAX_LABEL_VALUE_LENGTH = 128
 # Configuration
 # ======================
 
+CONFIG_ERRORS: list[str] = []
+
+def _parse_int_env(name: str, default: str) -> int:
+    """Parse an integer environment variable and record a validation error on failure."""
+    raw = os.getenv(name, default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        CONFIG_ERRORS.append(f"{name} must be an integer, got {raw!r}")
+        return int(default)
+
+def _parse_float_env(name: str, default: str) -> float:
+    """Parse a float environment variable and record a validation error on failure."""
+    raw = os.getenv(name, default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        CONFIG_ERRORS.append(f"{name} must be a number, got {raw!r}")
+        return float(default)
+
 AVALON_IPS_ENV = (os.getenv("AVALON_IPS", "") or "").strip()
 SINGLE_IP_ENV = (os.getenv("AVALON_IP", "") or "").strip()
-MINER_PORT = int(os.getenv("AVALON_PORT", "4028"))
-UPDATE_INTERVAL = float(os.getenv("UPDATE_INTERVAL", "10"))  # seconds
-EXPORTER_PORT = int(os.getenv("EXPORTER_PORT", "9100"))
+MINER_PORT = _parse_int_env("AVALON_PORT", "4028")
+UPDATE_INTERVAL = _parse_float_env("UPDATE_INTERVAL", "10")  # seconds
+EXPORTER_PORT = _parse_int_env("EXPORTER_PORT", "9100")
 
 # Optional: export per-chip metrics (can be a LOT of series)
 EXPORT_CHIP_METRICS = os.getenv("EXPORT_CHIP_METRICS", "0").lower() in ("1", "true", "yes", "on")
 
 # Optional: TCP timeout to miner API
-MINER_TIMEOUT = float(os.getenv("MINER_TIMEOUT", "5.0"))
+MINER_TIMEOUT = _parse_float_env("MINER_TIMEOUT", "5.0")
 
 # Optional: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -149,8 +169,8 @@ MINER_METRIC_META: dict[str, tuple[str, str]] = {
     "avalon_best_share":                    ("gauge", "Best share value seen (session)."),
     "avalon_device_hw_error_percent":       ("gauge", "Device hardware error percentage (session)."),
     "avalon_device_rejected_percent":       ("gauge", "Device rejected percentage (session)."),
-    "avalon_pool_rejected_percent":         ("gauge", "Pool rejected share percentage."),
-    "avalon_pool_stale_percent":            ("gauge", "Pool stale share percentage."),
+    "avalon_session_pool_rejected_percent": ("gauge", "Session-wide pool rejected share percentage."),
+    "avalon_session_pool_stale_percent":    ("gauge", "Session-wide pool stale share percentage."),
     "avalon_work_utility_summary":          ("gauge", "Work utility from summary."),
     # Chip aggregates
     "avalon_chip_count":                    ("gauge", "Number of chips detected across PVT_T0/PVT_V0/MW0."),
@@ -214,7 +234,7 @@ POOL_METRIC_META: dict[str, tuple[str, str]] = {
 
 def validate_configuration() -> None:
     """Validate configuration values and raise SystemExit on error."""
-    errors: list[str] = []
+    errors: list[str] = list(CONFIG_ERRORS)
     
     if UPDATE_INTERVAL <= 0:
         errors.append(f"UPDATE_INTERVAL must be > 0, got {UPDATE_INTERVAL}")
@@ -765,8 +785,8 @@ def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
     for key, val in [
         ("avalon_device_hw_error_percent", summary_kv.get("Device Hardware%", "N/A")),
         ("avalon_device_rejected_percent", summary_kv.get("Device Rejected%", "N/A")),
-        ("avalon_pool_rejected_percent", summary_kv.get("Pool Rejected%", "N/A")),
-        ("avalon_pool_stale_percent", summary_kv.get("Pool Stale%", "N/A")),
+        ("avalon_session_pool_rejected_percent", summary_kv.get("Pool Rejected%", "N/A")),
+        ("avalon_session_pool_stale_percent", summary_kv.get("Pool Stale%", "N/A")),
         ("avalon_work_utility_summary", summary_kv.get("Work Utility", "N/A")),
     ]:
         f = parse_float(val)
@@ -991,13 +1011,23 @@ def collect_for(ip: str, port: int) -> tuple[dict[str, float], list[PoolData], l
         raise ValueError(f"Empty response from {ip}:{port}")
     
     sections = split_combined_response(raw)
+
+    required_sections = ("version", "summary", "stats", "pools")
+    missing_sections = [name for name in required_sections if not sections.get(name)]
+    if missing_sections:
+        raise ValueError(
+            f"Incomplete response from {ip}:{port}; missing section(s): "
+            f"{', '.join(missing_sections)}"
+        )
     
-    version_section = sections.get("version", "")
-    summary_section = sections.get("summary", "")
-    stats_section = sections.get("stats", "")
-    pools_section = sections.get("pools", "")
+    version_section = sections["version"]
+    summary_section = sections["summary"]
+    stats_section = sections["stats"]
+    pools_section = sections["pools"]
     
-    stats0 = get_stats0_segment(stats_section) or ""
+    stats0 = get_stats0_segment(stats_section)
+    if not stats0:
+        raise ValueError(f"Incomplete response from {ip}:{port}; missing STATS=0 section")
     
     # Parse miner-level metrics
     metrics = _parse_miner_metrics(stats0, summary_section)
@@ -1414,7 +1444,7 @@ def main():
     poller_thread.start()
     
     # Create HTTP server
-    server = HTTPServer(("0.0.0.0", EXPORTER_PORT), AvalonHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", EXPORTER_PORT), AvalonHandler)
     
     logger.info(
         f"Avalon exporter v{__version__} listening on 0.0.0.0:{EXPORTER_PORT}, "

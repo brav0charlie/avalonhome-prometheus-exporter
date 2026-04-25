@@ -20,7 +20,7 @@ EXPOSE 9100
 
 # Healthcheck hits /health using python stdlib (no curl/wget dependency)
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9100/health', timeout=2).read()"
+  CMD python -c "import os, urllib.request; port = os.getenv('EXPORTER_PORT', '9100'); urllib.request.urlopen(f'http://127.0.0.1:{port}/health', timeout=2).read()"
 
 USER app
 
