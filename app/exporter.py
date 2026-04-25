@@ -991,13 +991,23 @@ def collect_for(ip: str, port: int) -> tuple[dict[str, float], list[PoolData], l
         raise ValueError(f"Empty response from {ip}:{port}")
     
     sections = split_combined_response(raw)
+
+    required_sections = ("version", "summary", "stats", "pools")
+    missing_sections = [name for name in required_sections if not sections.get(name)]
+    if missing_sections:
+        raise ValueError(
+            f"Incomplete response from {ip}:{port}; missing section(s): "
+            f"{', '.join(missing_sections)}"
+        )
     
-    version_section = sections.get("version", "")
-    summary_section = sections.get("summary", "")
-    stats_section = sections.get("stats", "")
-    pools_section = sections.get("pools", "")
+    version_section = sections["version"]
+    summary_section = sections["summary"]
+    stats_section = sections["stats"]
+    pools_section = sections["pools"]
     
-    stats0 = get_stats0_segment(stats_section) or ""
+    stats0 = get_stats0_segment(stats_section)
+    if not stats0:
+        raise ValueError(f"Incomplete response from {ip}:{port}; missing STATS=0 section")
     
     # Parse miner-level metrics
     metrics = _parse_miner_metrics(stats0, summary_section)
