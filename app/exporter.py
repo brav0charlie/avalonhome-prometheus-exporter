@@ -149,8 +149,8 @@ MINER_METRIC_META: dict[str, tuple[str, str]] = {
     "avalon_best_share":                    ("gauge", "Best share value seen (session)."),
     "avalon_device_hw_error_percent":       ("gauge", "Device hardware error percentage (session)."),
     "avalon_device_rejected_percent":       ("gauge", "Device rejected percentage (session)."),
-    "avalon_pool_rejected_percent":         ("gauge", "Pool rejected share percentage."),
-    "avalon_pool_stale_percent":            ("gauge", "Pool stale share percentage."),
+    "avalon_session_pool_rejected_percent": ("gauge", "Session-wide pool rejected share percentage."),
+    "avalon_session_pool_stale_percent":    ("gauge", "Session-wide pool stale share percentage."),
     "avalon_work_utility_summary":          ("gauge", "Work utility from summary."),
     # Chip aggregates
     "avalon_chip_count":                    ("gauge", "Number of chips detected across PVT_T0/PVT_V0/MW0."),
@@ -765,8 +765,8 @@ def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
     for key, val in [
         ("avalon_device_hw_error_percent", summary_kv.get("Device Hardware%", "N/A")),
         ("avalon_device_rejected_percent", summary_kv.get("Device Rejected%", "N/A")),
-        ("avalon_pool_rejected_percent", summary_kv.get("Pool Rejected%", "N/A")),
-        ("avalon_pool_stale_percent", summary_kv.get("Pool Stale%", "N/A")),
+        ("avalon_session_pool_rejected_percent", summary_kv.get("Pool Rejected%", "N/A")),
+        ("avalon_session_pool_stale_percent", summary_kv.get("Pool Stale%", "N/A")),
         ("avalon_work_utility_summary", summary_kv.get("Work Utility", "N/A")),
     ]:
         f = parse_float(val)

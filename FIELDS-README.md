@@ -83,15 +83,14 @@ Labels come from these raw keys:
 These come from `summary`, and represent session-wide ratios:
 - `Device Hardware%` → `avalon_device_hw_error_percent`
 - `Device Rejected%` → `avalon_device_rejected_percent`
-- `Pool Rejected%` → `avalon_pool_rejected_percent`
-- `Pool Stale%` → `avalon_pool_stale_percent`
+- `Pool Rejected%` → `avalon_session_pool_rejected_percent`
+- `Pool Stale%` → `avalon_session_pool_stale_percent`
 
 ### Work utility (summary)
 - `Work Utility` → `avalon_work_utility_summary`
 
 > Distinction: The exporter also emits **per-pool** rejected/stale percentages from `pools` (`Pool Rejected%`, `Pool Stale%`)
-> under `avalon_pool_rejected_percent` / `avalon_pool_stale_percent` with pool labels. Those are separate series because they carry
-> `pool_index=...` labels.
+> under `avalon_pool_rejected_percent` / `avalon_pool_stale_percent` with pool labels.
 
 ---
 
