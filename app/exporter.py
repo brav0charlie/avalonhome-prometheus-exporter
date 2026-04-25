@@ -14,7 +14,7 @@ import logging
 import signal
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import TypedDict
 from urllib.parse import urlparse
 
@@ -1444,7 +1444,7 @@ def main():
     poller_thread.start()
     
     # Create HTTP server
-    server = HTTPServer(("0.0.0.0", EXPORTER_PORT), AvalonHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", EXPORTER_PORT), AvalonHandler)
     
     logger.info(
         f"Avalon exporter v{__version__} listening on 0.0.0.0:{EXPORTER_PORT}, "
