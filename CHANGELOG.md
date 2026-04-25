@@ -13,6 +13,8 @@ This project follows semantic versioning: https://semver.org/
 - Route invalid numeric environment values through the normal configuration validation path with clear error messages.
 - Serve HTTP requests concurrently so a slow `/metrics` or `/debug` client does not block `/health`.
 - Refresh troubleshooting commands for the current Compose service name, v0.3.x health output, and the gated `/debug` endpoint.
+- Replace the Grafana dashboard export with a valid sanitized schema v2 dashboard.
+- Clean up Docker Compose service/container naming to use `avalonhome-exporter`.
 
 ### Notes
 - Per-pool Grafana/dashboard queries using `avalon_pool_rejected_percent` and `avalon_pool_stale_percent` do not need to change.
