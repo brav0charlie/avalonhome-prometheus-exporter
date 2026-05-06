@@ -585,7 +585,7 @@
         "kind": "Panel",
         "spec": {
           "id": 104,
-          "title": "Power Efficiency (Watts / TH/s)",
+          "title": "Power Efficiency (W/TH)",
           "description": "",
           "links": [],
           "data": {
@@ -644,8 +644,8 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "displayName": "Power Efficiency (W / TH/s)",
-                  "unit": "W / TH/s",
+                  "displayName": "Power Efficiency (W/TH)",
+                  "unit": "suffix: W/TH",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
