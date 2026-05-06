@@ -601,7 +601,7 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "avalon_power_pout_wall{ip=\"$miner\"}\n/\n(avalon_hashrate_ghs{ip=\"$miner\"} / 1000)\nand\navalon_hashrate_ghs{ip=\"$miner\"} > 0",
+                        "expr": "(avalon_power_pout_wall{ip=\"$miner\"} * 1000)\n/\navalon_hashrate_ghs{ip=\"$miner\"}",
                         "legendFormat": "__auto",
                         "range": true
                       },
