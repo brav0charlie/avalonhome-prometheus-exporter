@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [v0.3.2] - 2026-05-06
+
+### Fixed
+- Correct the Grafana dashboard power efficiency panel so it reports realistic W/TH values again.
+- Simplify the power efficiency PromQL to calculate `(avalon_power_pout_wall * 1000) / avalon_hashrate_ghs`, avoiding Grafana/Prometheus expression ambiguity around converting GH/s to TH/s.
+- Disable Grafana unit scaling on the power efficiency panel and label the axis as `W/TH` so the calculated value is displayed directly.
+
+### Notes
+- Exporter metric names and emitted metric values are unchanged in this release.
+- The dashboard now computes efficiency from miner-reported wall power, which may differ slightly from an external wall meter.
+
+[v0.3.2]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.3.2
+
 ## [v0.3.1] - 2026-04-25
 
 ### Fixed
