@@ -645,7 +645,7 @@
               "fieldConfig": {
                 "defaults": {
                   "displayName": "Power Efficiency (W/TH)",
-                  "unit": "suffix: W/TH",
+                  "unit": "none",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -662,7 +662,7 @@
                     "axisBorderShow": false,
                     "axisCenteredZero": false,
                     "axisColorMode": "text",
-                    "axisLabel": "",
+                    "axisLabel": "W/TH",
                     "axisPlacement": "auto",
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
