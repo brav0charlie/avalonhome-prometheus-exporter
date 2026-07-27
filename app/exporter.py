@@ -132,17 +132,24 @@ MINER_METRIC_META: dict[str, tuple[str, str]] = {
     "avalon_lcd_switch":                    ("gauge", "LCD switching enabled (0/1)."),
     # Temperatures
     "avalon_temp_inlet_celsius":            ("gauge", "Inlet/intake temperature in Celsius (may be -273 on some firmware)."),
+    "avalon_temp_current_celsius":          ("gauge", "Current miner temperature in Celsius (Temp)."),
     "avalon_temp_outlet_celsius":           ("gauge", "Outlet/exhaust temperature in Celsius."),
     "avalon_temp_avg_celsius":              ("gauge", "Average ASIC temperature in Celsius."),
     "avalon_temp_max_celsius":              ("gauge", "Maximum observed ASIC temperature in Celsius."),
     "avalon_temp_target_celsius":           ("gauge", "Target temperature used by the control loop in Celsius."),
     # ASIC topology
     "avalon_total_asics":                   ("gauge", "Total number of ASICs present."),
+    "avalon_hash_boards":                   ("gauge", "Number of hash boards reported by firmware."),
+    "avalon_system_working":                ("gauge", "Whether the firmware system status reports active work (0/1)."),
     # Fans
     "avalon_fan1_rpm":                      ("gauge", "Primary fan speed in RPM."),
+    "avalon_fan2_rpm":                      ("gauge", "Secondary fan speed in RPM."),
     "avalon_fan_duty_percent":              ("gauge", "Fan duty cycle percentage."),
     # Hashrate & performance
-    "avalon_hashrate_ghs":                  ("gauge", "Instantaneous hashrate in GH/s."),
+    "avalon_hashrate_ghs":                  ("gauge", "Short-window hashrate in GH/s."),
+    "avalon_hashrate_1m_ghs":               ("gauge", "One-minute hashrate in GH/s from summary MHS 1m."),
+    "avalon_hashrate_5m_ghs":               ("gauge", "Five-minute hashrate in GH/s from summary MHS 5m."),
+    "avalon_hashrate_15m_ghs":              ("gauge", "Fifteen-minute hashrate in GH/s from summary MHS 15m."),
     "avalon_hashrate_moving_ghs":           ("gauge", "Moving/medium-window average hashrate in GH/s."),
     "avalon_hashrate_avg_ghs":              ("gauge", "Longer-term average hashrate in GH/s."),
     "avalon_work_utility":                  ("gauge", "Work utility from stats."),
@@ -173,7 +180,7 @@ MINER_METRIC_META: dict[str, tuple[str, str]] = {
     "avalon_session_pool_stale_percent":    ("gauge", "Session-wide pool stale share percentage."),
     "avalon_work_utility_summary":          ("gauge", "Work utility from summary."),
     # Chip aggregates
-    "avalon_chip_count":                    ("gauge", "Number of chips detected across PVT_T0/PVT_V0/MW0."),
+    "avalon_chip_count":                    ("gauge", "Number of chips detected across PVT_T*/PVT_V*/MW* arrays."),
     "avalon_chip_temp_min_celsius":         ("gauge", "Minimum per-chip temperature in Celsius."),
     "avalon_chip_temp_avg_celsius":         ("gauge", "Average per-chip temperature in Celsius."),
     "avalon_chip_temp_max_celsius":         ("gauge", "Maximum per-chip temperature in Celsius."),
@@ -463,6 +470,36 @@ def bool_numeric(raw_val: str | None) -> float:
         return 1.0
     return 0.0
 
+def parse_summary_mhs_to_ghs(value: str | None) -> float | None:
+    """Parse a CGMiner summary MHS value and convert it to GH/s."""
+    f = parse_float(value)
+    if f is None:
+        return None
+    return f / 1000.0
+
+def parse_system_hash_boards(value: str | None) -> int | None:
+    """Extract hash-board count from SYSTEMSTATU strings such as 'Hash Board: 2'."""
+    if not value:
+        return None
+    m = re.search(r"Hash\s+Board:\s*(\d+)", str(value), flags=re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+def parse_system_working(value: str | None) -> float | None:
+    """Return 1 when SYSTEMSTATU indicates active work, 0 when it indicates no work."""
+    if not value:
+        return None
+    s = str(value).lower()
+    if "in work" in s:
+        return 1.0
+    if "no work" in s or "idle" in s or "stopped" in s:
+        return 0.0
+    return None
+
 def parse_csv_kv(segment: str) -> dict[str, str]:
     """Parse a CSV segment of key=value pairs into a dict. Handles keys with spaces."""
     result: dict[str, str] = {}
@@ -692,6 +729,7 @@ def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
     # Temps (report ITemp as-is, even if -273)
     for key, val in [
         ("avalon_temp_inlet_celsius", bracket.get("ITemp", "N/A")),
+        ("avalon_temp_current_celsius", bracket.get("Temp", "N/A")),
         ("avalon_temp_outlet_celsius", bracket.get("OTemp", "N/A")),
         ("avalon_temp_avg_celsius", bracket.get("TAvg", "N/A")),
         ("avalon_temp_max_celsius", bracket.get("TMax", "N/A")),
@@ -706,23 +744,48 @@ def _parse_miner_metrics(stats0: str, summary_section: str) -> dict[str, float]:
     if total_asics is not None:
         metrics["avalon_total_asics"] = float(total_asics)
 
+    system_status = bracket.get("SYSTEMSTATU", "")
+    hash_boards = parse_system_hash_boards(system_status)
+    if hash_boards is not None:
+        metrics["avalon_hash_boards"] = float(hash_boards)
+    system_working = parse_system_working(system_status)
+    if system_working is not None:
+        metrics["avalon_system_working"] = system_working
+
     # Fans
     f_fan1 = parse_float(bracket.get("Fan1", "N/A"))
     if f_fan1 is not None:
         metrics["avalon_fan1_rpm"] = f_fan1
+    f_fan2 = parse_float(bracket.get("Fan2", "N/A"))
+    if f_fan2 is not None:
+        metrics["avalon_fan2_rpm"] = f_fan2
     f_fanr = parse_float(bracket.get("FanR", "N/A"))
     if f_fanr is not None:
         metrics["avalon_fan_duty_percent"] = f_fanr
 
     # Hashrate & WU
+    hashrate_short = parse_float(bracket.get("GHSspd", "N/A"))
+    if hashrate_short is None:
+        hashrate_short = parse_summary_mhs_to_ghs(summary_kv.get("MHS 30s", "N/A"))
+    if hashrate_short is not None:
+        metrics["avalon_hashrate_ghs"] = hashrate_short
+
     for key, val in [
-        ("avalon_hashrate_ghs", bracket.get("GHSspd", "N/A")),
         ("avalon_hashrate_moving_ghs", bracket.get("GHSmm", "N/A")),
         ("avalon_hashrate_avg_ghs", bracket.get("GHSavg", "N/A")),
         ("avalon_work_utility", bracket.get("WU", "N/A")),
         ("avalon_frequency_mhz", bracket.get("Freq", "N/A")),
     ]:
         f = parse_float(val)
+        if f is not None:
+            metrics[key] = f
+
+    for key, val in [
+        ("avalon_hashrate_1m_ghs", summary_kv.get("MHS 1m", "N/A")),
+        ("avalon_hashrate_5m_ghs", summary_kv.get("MHS 5m", "N/A")),
+        ("avalon_hashrate_15m_ghs", summary_kv.get("MHS 15m", "N/A")),
+    ]:
+        f = parse_summary_mhs_to_ghs(val)
         if f is not None:
             metrics[key] = f
 
@@ -811,14 +874,20 @@ def _parse_chip_metrics(stats0: str) -> tuple[dict[str, float], list[ChipData]]:
     # Pre-parse stats0 for O(1) lookups
     bracket = parse_all_bracket(stats0)
 
-    # Chip temps (PVT_T0), voltages (PVT_V0), chip matching-work telemetry (MW0)
-    chip_t_raw = bracket.get("PVT_T0", "N/A")
-    chip_v_raw = bracket.get("PVT_V0", "N/A")
-    chip_mw_raw = bracket.get("MW0", "N/A")
-    
-    chip_t = parse_int_list(chip_t_raw) if chip_t_raw != "N/A" else []
-    chip_v_ints = parse_int_list(chip_v_raw) if chip_v_raw != "N/A" else []
-    chip_mw = parse_int_list(chip_mw_raw) if chip_mw_raw != "N/A" else []
+    # Chip temps, voltages, and matching-work telemetry. Some Avalon 10-series
+    # miners report one array per hash board, e.g. PVT_T0/PVT_T1.
+    chip_t: list[int] = []
+    chip_v_ints: list[int] = []
+    chip_mw: list[int] = []
+    for key, dest in [
+        ("PVT_T", chip_t),
+        ("PVT_V", chip_v_ints),
+        ("MW", chip_mw),
+    ]:
+        for idx in range(16):
+            raw = bracket.get(f"{key}{idx}", "N/A")
+            if raw != "N/A":
+                dest.extend(parse_int_list(raw))
     
     chip_count = max(len(chip_t), len(chip_v_ints), len(chip_mw))
     if chip_count > 0:

@@ -6,6 +6,7 @@ A lightweight, zero-dependency Prometheus exporter for **Avalon Home-series ASIC
 
 - **Avalon Nano 3S**
 - **Avalon Mini 3**
+- **AvalonMiner 1047**
 - Other Avalon Home-series miners using the CGMiner TCP API
 
 The exporter polls miners over their CGMiner TCP API (default port **4028**) and exposes a Prometheus-compatible `/metrics` endpoint with accurate, low-level miner telemetry suitable for Grafana dashboards and long-term monitoring.
@@ -15,7 +16,7 @@ The exporter polls miners over their CGMiner TCP API (default port **4028**) and
 ## 🚀 Features
 
 ✔ Supports **multiple miners** (comma-separated hostnames/IPs)  
-✔ Automatic detection of **Nano 3S** and **Mini 3** via `version`  
+✔ Automatic detection of **Nano 3S**, **Mini 3**, and **AvalonMiner 1047** via `version`
 ✔ Uses CGMiner API commands combined into a single request:
 
 - `version`
@@ -32,6 +33,8 @@ The exporter polls miners over their CGMiner TCP API (default port **4028**) and
 - Temperatures (inlet, outlet, average, max, target)
 - Fan RPM and duty %
 - Share stats (accepted, rejected, stale)
+- AvalonMiner 1047 second fan, current temperature, hash-board count, and
+  summary hashrate windows
 - Pool performance (per pool index)
 - Work utility
 - Hardware error counters and rates
@@ -41,8 +44,8 @@ The exporter polls miners over their CGMiner TCP API (default port **4028**) and
 
 ✔ Optional extended telemetry:
 
-- Per-chip voltage telemetry (PVT_V0)
-- Per-chip matching-work telemetry (MW0)
+- Per-chip voltage telemetry (PVT_V0/PVT_V1)
+- Per-chip matching-work telemetry (MW0/MW1)
 - Power / board telemetry (MPO / PS)
 - Extended pool/network counters from `stats`
 
