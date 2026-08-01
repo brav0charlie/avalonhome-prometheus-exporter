@@ -11,7 +11,7 @@ _Nothing yet._
 ## [v0.4.0] - 2026-08-01
 
 ### Added
-- Add AvalonMiner 1047 support, contributed by [@nicosmuts](https://github.com/nicosmuts) in [PR #5](https://github.com/brav0charlie/avalonhome-prometheus-exporter/pull/5) ([ab39e58](https://github.com/brav0charlie/avalonhome-prometheus-exporter/commit/ab39e5807a11c9827971580822cd7882b59ac0ca)):
+- Add AvalonMiner 1047 support, contributed by [@nicosmuts](https://github.com/nicosmuts) in [PR #5](https://github.com/brav0charlie/avalonhome-prometheus-exporter/pull/5):
   - Export current miner temperature from `Temp` as `avalon_temp_current_celsius`.
   - Export secondary fan speed from `Fan2` as `avalon_fan2_rpm`.
   - Export the official `SYSTEMSTATU` work states and hash-board count as `avalon_system_working` and `avalon_hash_boards`.
