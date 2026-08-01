@@ -33,6 +33,21 @@ VERSION_1047 = (
 
 
 class AvalonMiner1047ParsingTest(unittest.TestCase):
+    def test_system_working_handles_official_avalon_states(self):
+        cases = {
+            "Work: In Work, Hash Board: 2": 1.0,
+            "Work: In Idle, Hash Board: 2": 0.0,
+            "Work: In Init, Hash Board: 2": 0.0,
+            "Work: In Fault, Hash Board: 2": 0.0,
+        }
+
+        for status, want in cases.items():
+            with self.subTest(status=status):
+                self.assertEqual(exporter.parse_system_working(status), want)
+
+    def test_system_working_preserves_none_for_unknown_status(self):
+        self.assertIsNone(exporter.parse_system_working("Work: In Mystery, Hash Board: 2"))
+
     def test_miner_metrics_parse_1047_summary_and_stats_fields(self):
         metrics = exporter._parse_miner_metrics(STATS0_1047, SUMMARY_1047)
 

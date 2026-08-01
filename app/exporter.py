@@ -496,7 +496,8 @@ def parse_system_working(value: str | None) -> float | None:
     s = str(value).lower()
     if "in work" in s:
         return 1.0
-    if "no work" in s or "idle" in s or "stopped" in s:
+    inactive_states = ("in idle", "in init", "in fault", "no work", "idle", "stopped")
+    if any(status in s for status in inactive_states):
         return 0.0
     return None
 
