@@ -2,12 +2,12 @@
 
 ⚠️ IMPORTANT NOTE: I vibe-coded the shit out of this on ChatGPT & Claude.
 
-A lightweight, zero-dependency Prometheus exporter for **Avalon Home-series ASIC miners**, including:
+A lightweight, zero-dependency Prometheus exporter for **Avalon ASIC miners**, including:
 
 - **Avalon Nano 3S**
 - **Avalon Mini 3**
 - **AvalonMiner 1047**
-- Other Avalon Home-series miners using the CGMiner TCP API
+- Other compatible Avalon miners using the CGMiner TCP API
 
 The exporter polls miners over their CGMiner TCP API (default port **4028**) and exposes a Prometheus-compatible `/metrics` endpoint with accurate, low-level miner telemetry suitable for Grafana dashboards and long-term monitoring.
 
@@ -44,8 +44,8 @@ The exporter polls miners over their CGMiner TCP API (default port **4028**) and
 
 ✔ Optional extended telemetry:
 
-- Per-chip voltage telemetry (PVT_V0/PVT_V1)
-- Per-chip matching-work telemetry (MW0/MW1)
+- Per-chip temperature, voltage, and matching-work telemetry from board-indexed
+  `PVT_T*`, `PVT_V*`, and `MW*` arrays
 - Power / board telemetry (MPO / PS)
 - Extended pool/network counters from `stats`
 
@@ -97,7 +97,7 @@ UPDATE_INTERVAL=15
 EXPORTER_PORT=9100
 
 # --- Extended Metrics ---
-# Enable extra high-cardinality / per-chip telemetry (PVT_V0, MW0, etc.)
+# Enable extra high-cardinality / per-chip telemetry (PVT_T*, PVT_V*, MW*)
 EXPORT_CHIP_METRICS=false
 
 # --- Miner API Timeout (optional) ---
@@ -156,7 +156,7 @@ docker run -d \
   -e EXPORT_CHIP_METRICS=false \
   -e MINER_TIMEOUT=5.0 \
   -e LOG_LEVEL=INFO \
-  avalonhome-prometheus-exporter
+  ghcr.io/brav0charlie/avalonhome-prometheus-exporter:v0.4.0
 ```
 
 ### Multiple Miners
@@ -172,7 +172,7 @@ docker run -d \
   -e EXPORT_CHIP_METRICS=false \
   -e MINER_TIMEOUT=5.0 \
   -e LOG_LEVEL=INFO \
-  avalonhome-prometheus-exporter
+  ghcr.io/brav0charlie/avalonhome-prometheus-exporter:v0.4.0
 ```
 
 ---
@@ -186,12 +186,12 @@ docker run -d \
 | `AVALON_PORT` | Miner TCP API port | `4028` |
 | `UPDATE_INTERVAL` | Polling frequency in seconds (must be > 0) | `10` |
 | `EXPORTER_PORT` | Exporter HTTP port (must be 1–65535) | `9100` |
-| `EXPORT_CHIP_METRICS` | Enable per-chip telemetry (PVT_V0, MW0, high-cardinality) | `false` |
+| `EXPORT_CHIP_METRICS` | Enable per-chip `PVT_T*`, `PVT_V*`, and `MW*` series (high cardinality) | `false` |
 | `MINER_TIMEOUT` | TCP connection timeout in seconds (must be > 0) | `5.0` |
 | `ENABLE_DEBUG_ENDPOINT` | Enable the `/debug` endpoint (exposes internal state including miner IPs and error messages) | `false` |
 | `LOG_LEVEL` | Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL | `INFO` |
 
-Only one of `AVALON_IP` or `AVALON_IPS` must be set.
+Exactly one of `AVALON_IP` or `AVALON_IPS` must be set.
 
 **Configuration Validation:** The exporter validates all configuration values at startup and will exit with clear error messages if any values are invalid (e.g., negative intervals, out-of-range ports, invalid hostnames).
 
@@ -199,9 +199,10 @@ Only one of `AVALON_IP` or `AVALON_IPS` must be set.
 
 ## 📡 Exported Metrics
 
-For detailed information, see `FIELDS-README.md`.
+For detailed information, see
+[docs/FIELDS-README.md](docs/FIELDS-README.md).
 
-All metrics include the label:
+Miner, pool, and chip metrics include the label:
 
 ```text
 ip="192.168.x.x"
@@ -258,6 +259,9 @@ avalon_info{
 
 ```text
 avalon_hashrate_ghs
+avalon_hashrate_1m_ghs
+avalon_hashrate_5m_ghs
+avalon_hashrate_15m_ghs
 avalon_hashrate_moving_ghs
 avalon_hashrate_avg_ghs
 avalon_work_utility
@@ -275,6 +279,7 @@ avalon_hashrate_ghs / 1000
 
 ```text
 avalon_temp_inlet_celsius
+avalon_temp_current_celsius
 avalon_temp_outlet_celsius
 avalon_temp_avg_celsius
 avalon_temp_max_celsius
@@ -289,8 +294,22 @@ avalon_temp_target_celsius
 
 ```text
 avalon_fan1_rpm
+avalon_fan2_rpm
 avalon_fan_duty_percent
 ```
+
+---
+
+### 🟠 System Status
+
+```text
+avalon_system_working
+avalon_hash_boards
+```
+
+`avalon_system_working` is `1` for `In Work` and `0` for the official
+`In Init`, `In Idle`, and `In Fault` states. The metric is omitted for unknown
+or missing firmware states rather than treating them as working or stopped.
 
 ---
 
@@ -341,29 +360,43 @@ avalon_pool_times_recv_total
 
 ---
 
-## 🔬 Chip-Level Telemetry (Optional)
+## 🔬 Chip Telemetry
 
-These metrics are exported **only** when:
+When firmware supplies board-indexed `PVT_T*`, `PVT_V*`, or `MW*` arrays, the
+exporter combines arrays from hash-board suffixes 0 through 15 and emits
+aggregate metrics automatically:
+
+```text
+avalon_chip_count
+avalon_chip_temp_min_celsius
+avalon_chip_temp_avg_celsius
+avalon_chip_temp_max_celsius
+avalon_chip_voltage_min_volts
+avalon_chip_voltage_avg_volts
+avalon_chip_voltage_max_volts
+avalon_chip_matching_work_min
+avalon_chip_matching_work_avg
+avalon_chip_matching_work_max
+avalon_chip_matching_work_sum
+```
+
+Individual high-cardinality chip series are exported **only** when:
 
 ```bash
 EXPORT_CHIP_METRICS=true
 ```
 
-### Per-chip voltage (PVT_V0)
+### Per-chip temperature, voltage, and matching work
 
 ```text
+avalon_chip_temp_celsius
 avalon_chip_voltage_volts
-```
-
-Values are reported in volts (e.g. `3.03`).
-
-### Per-chip nonce / matching-work telemetry (MW0)
-
-```text
 avalon_chip_matching_work
 ```
 
-This represents **per-chip NONCE / matching-work activity**, not power.
+Chip labels are zero-padded (for example, `chip="000"`). Voltage values are
+reported in volts (for example, `3.03`). Matching work represents per-chip
+nonce/matching-work activity, not power.
 
 Grafana panels consuming these metrics should be configured to **hide when no data is present**.
 
@@ -429,9 +462,12 @@ A prebuilt Grafana dashboard is included in the repository and supports:
 
 Additional documentation is available:
 
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** — Production deployment guide with Docker, systemd, performance tuning, and monitoring recommendations
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — Troubleshooting guide for common issues, error types, and debugging techniques
-- **[FIELDS-README.md](FIELDS-README.md)** — Detailed reference for raw miner API fields and how they map to Prometheus metrics
+- **[Deployment guide](docs/DEPLOYMENT.md)** — Production deployment with Docker, systemd, performance tuning, and monitoring recommendations
+- **[Troubleshooting guide](docs/TROUBLESHOOTING.md)** — Common issues, error types, and debugging techniques
+- **[Field reference](docs/FIELDS-README.md)** — Raw miner API fields and their Prometheus metric mappings
+- **[AvalonMiner 1047 notes](docs/AVALONMINER-1047.md)** — Sanitized parser contract and compatibility notes
+- **[QUICKREF.md](QUICKREF.md)** — Contributor commands, architecture, safety boundaries, and release checklist
+- **[GIT_STANDARDS.md](GIT_STANDARDS.md)** — Binding repository workflow, signing, attribution, and release standards
 
 ---
 
@@ -439,19 +475,35 @@ Additional documentation is available:
 
 ```text
 avalonhome-prometheus-exporter/
+├── .github/workflows/
+│   └── docker.yml
+├── .codex/
+│   └── config.toml
 ├── app/
 │   └── exporter.py
+├── docs/
+│   ├── AVALONMINER-1047.md
+│   ├── DEPLOYMENT.md
+│   ├── FIELDS-README.md
+│   └── TROUBLESHOOTING.md
 ├── grafana/
 │   └── avalonhome-miner-dashboard.json
+├── history/
+│   ├── decisions/
+│   ├── logs/
+│   └── tasks/
+├── tests/
+│   └── test_avalonminer_1047.py
 ├── .env.example
+├── AGENTS.md
 ├── CHANGELOG.md
-├── DEPLOYMENT.md
+├── CLAUDE.md
 ├── docker-compose.yml
 ├── Dockerfile
-├── FIELDS-README.md
+├── GIT_STANDARDS.md
 ├── LICENSE
-├── README.md
-└── TROUBLESHOOTING.md
+├── QUICKREF.md
+└── README.md
 ```
 
 ---

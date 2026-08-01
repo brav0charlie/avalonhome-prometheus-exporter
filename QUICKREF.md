@@ -4,8 +4,8 @@ Use this file for common commands, workflows, naming conventions, safety
 boundaries, and completion checklists. `GIT_STANDARDS.md` is authoritative for
 version control, signing, attribution, pull requests, and releases. Project
 architecture and agent guidance live in `AGENTS.md`; metric semantics live in
-`FIELDS-README.md`; deployment and operational guidance live in
-`DEPLOYMENT.md` and `TROUBLESHOOTING.md`.
+`docs/FIELDS-README.md`; deployment and operational guidance live in
+`docs/DEPLOYMENT.md` and `docs/TROUBLESHOOTING.md`.
 
 ## Repository Workflow
 
@@ -140,8 +140,8 @@ validated at startup.
   filter it.
 - Keep every emitted miner or pool metric documented with `# HELP` and
   `# TYPE` metadata.
-- Update `FIELDS-README.md` whenever raw-field mappings, units, fallbacks, or
-  metric names change.
+- Update `docs/FIELDS-README.md` whenever raw-field mappings, units, fallbacks,
+  or metric names change.
 - Update the Grafana dashboard when a metric rename or semantic change affects
   an existing query.
 - Bound labels with `_escape_label_value()` and avoid adding unbounded label
@@ -215,7 +215,7 @@ Update these current-version references for a release:
 - `app/exporter.py`: `__version__ = "X.Y.Z"`
 - `docker-compose.yml`: image tag `vX.Y.Z`
 - `README.md`: exporter metric, health, and version endpoint examples
-- `TROUBLESHOOTING.md`: expected health response
+- `docs/TROUBLESHOOTING.md`: expected health response
 - `CHANGELOG.md`: add a new `## [vX.Y.Z] - YYYY-MM-DD` section and release link
 - GitHub release/tag: signed, annotated `vX.Y.Z`
 
@@ -231,7 +231,7 @@ tag and `latest` as multi-architecture images for amd64 and arm64.
   or release behavior.
 - Keep the stdlib-only architecture unless a dependency is explicitly approved.
 - Add or update sanitized tests for behavior changes.
-- Update metric metadata and `FIELDS-README.md` for metric changes.
+- Update metric metadata and `docs/FIELDS-README.md` for metric changes.
 - Check Grafana queries for metric renames or semantic changes.
 - Run `python3 -m unittest discover -s tests -v` with Python 3.12.
 - Run `python3 -m compileall -q app tests`.

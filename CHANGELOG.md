@@ -20,12 +20,14 @@ _Nothing yet._
 - Add sanitized `unittest` coverage for AvalonMiner 1047 metrics, multi-board chip telemetry, version identity, all four official work states, and unknown-state handling.
 
 ### Changed
-- Expand `FIELDS-README.md` with the AvalonMiner 1047 field mappings, hashrate fallback rules, system-state behavior, and multi-board chip-array semantics.
+- Expand `docs/FIELDS-README.md` with the AvalonMiner 1047 field mappings, hashrate fallback rules, system-state behavior, and multi-board chip-array semantics.
+- Move deployment, troubleshooting, field-reference, and AvalonMiner 1047 documentation into `docs/` to keep the repository root focused on entry-point and governance files.
 - Bump exporter, container, and user-facing version references to v0.4.0.
 
 ### Changed (internal)
 - Add repository-wide Git, attribution, signing, history, and AI-assisted development standards.
 - Add `QUICKREF.md` with project commands, safety boundaries, testing expectations, release locations, and completion checklists.
+- Refresh `AGENTS.md` against the current architecture and tests, reduce `CLAUDE.md` to a shared-guidance pointer, and expand the README for the v0.4.0 metrics and contributor workflow.
 
 ### Notes
 - AvalonMiner 1047 support was validated by the contributor against two live miners running CGMiner 4.11.1 / API 3.7.
