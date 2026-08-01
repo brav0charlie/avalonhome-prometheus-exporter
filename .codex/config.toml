@@ -1,0 +1,3 @@
+[features]
+codex_git_commit = true
+commit_attribution = "Codex <noreply@openai.com>"
