@@ -15,9 +15,10 @@ The exporter uses a **single combined request** per scrape:
 
 > Notes:
 > - Values are exported **as-is** unless explicitly stated.
-> - Some fields are model/firmware dependent (Nano 3S vs Mini 3).
+> - Some fields are model/firmware dependent (Nano 3S, Mini 3, and AvalonMiner 1047).
 > - Some fields may report placeholder/sentinel values (e.g. `ITemp=-273` on some Nano 3S firmware).
 > - Per-chip metrics are exported only when `EXPORT_CHIP_METRICS=true`.
+> - See [AVALONMINER-1047.md](AVALONMINER-1047.md) for the sanitized AvalonMiner 1047 parser contract.
 
 ---
 
@@ -27,7 +28,7 @@ For each miner (label `ip="..."`), the exporter emits:
 - Core scrape health metrics (`avalon_up`, timestamps, error counters)
 - Miner-level metrics derived from `summary` and `stats` (STATS=0)
 - Pool metrics derived from `pools` and `stats` pool segments (STATS=1..N with `ID=POOLx`)
-- Optional per-chip series derived from `PVT_T0`, `PVT_V0`, and `MW0`
+- Optional per-chip series derived from board-indexed `PVT_T*`, `PVT_V*`, and `MW*` arrays
 - A static info metric `avalon_info{...} 1` derived from `version`
 
 ---
@@ -72,6 +73,19 @@ Labels come from these raw keys:
 - `Elapsed` — seconds since cgminer started  
   Exported as: `avalon_uptime_seconds`
 
+### Hashrate windows
+
+AvalonMiner 1047 firmware reports these values in MH/s. The exporter divides
+them by 1,000 before emitting GH/s:
+
+- `MHS 30s` → `avalon_hashrate_ghs` when `GHSspd` is absent
+- `MHS 1m` → `avalon_hashrate_1m_ghs`
+- `MHS 5m` → `avalon_hashrate_5m_ghs`
+- `MHS 15m` → `avalon_hashrate_15m_ghs`
+
+When both fields exist, `GHSspd` remains the preferred source for
+`avalon_hashrate_ghs`.
+
 ### Shares / blocks / best share
 - `Accepted` → `avalon_shares_accepted_total`
 - `Rejected` → `avalon_shares_rejected_total`
@@ -115,6 +129,13 @@ The exporter uses the `STATS=0` segment (miner-level) and parses most values as 
 - `LcdSwitch[0|1]` — LCD switching enabled  
   Exported as: `avalon_lcd_switch` (0/1)
 
+- `SYSTEMSTATU[Work: <state>, Hash Board: <n>]` — firmware work state and
+  hash-board count
+  - `In Work` → `avalon_system_working` = 1
+  - `In Init`, `In Idle`, or `In Fault` → `avalon_system_working` = 0
+  - Unknown or missing states omit `avalon_system_working`
+  - `Hash Board: <n>` → `avalon_hash_boards`
+
 ### 5.2 Temperature fields
 
 All are reported in °C.
@@ -122,6 +143,8 @@ All are reported in °C.
 - `ITemp[<c>]` — inlet/intake temperature  
   Exported as: `avalon_temp_inlet_celsius`  
   *May be `-273` on some Nano 3S firmware; exported as-is for cross-model compatibility.*
+
+- `Temp[<c>]` — current miner temperature (AvalonMiner 1047 and compatible firmware) → `avalon_temp_current_celsius`
 
 - `OTemp[<c>]` — outlet/exhaust temperature  
   Exported as: `avalon_temp_outlet_celsius`
@@ -142,20 +165,29 @@ All are reported in °C.
 - `TA[<int>]` — **Total ASICs** present (NOT ambient temperature)  
   Exported as: `avalon_total_asics`
 
+- The hash-board count embedded in `SYSTEMSTATU` → `avalon_hash_boards`
+
 ### 5.4 Fan / cooling fields
 
 - `Fan1[<rpm>]` — primary fan speed  
   Exported as: `avalon_fan1_rpm`
+
+- `Fan2[<rpm>]` — secondary fan speed → `avalon_fan2_rpm`
 
 - `FanR[<percent>]` — fan duty cycle percent  
   Exported as: `avalon_fan_duty_percent`
 
 ### 5.5 Hashrate & performance fields
 
-All hashrate values are in **GHS** as reported by the miner.
+Stats-derived `GHS*` values are already in GH/s. Summary-derived `MHS*` values
+are converted from MH/s to GH/s by the exporter.
 
-- `GHSspd[<ghs>]` — instantaneous hashrate  
-  Exported as: `avalon_hashrate_ghs`
+- `GHSspd[<ghs>]` — short-window hashrate and preferred source → `avalon_hashrate_ghs`
+
+If `GHSspd` is absent, the exporter falls back to summary `MHS 30s`, converted
+from MH/s to GH/s. Summary `MHS 1m`, `MHS 5m`, and `MHS 15m` are exported as
+the corresponding `avalon_hashrate_1m_ghs`, `avalon_hashrate_5m_ghs`, and
+`avalon_hashrate_15m_ghs` metrics.
 
 - `GHSmm[<ghs>]` — moving/medium-window average  
   Exported as: `avalon_hashrate_moving_ghs`
@@ -233,11 +265,16 @@ In addition to raw slots, exporter.py decodes specific indices into named metric
 
 ## 6) Chip telemetry fields from `stats` (optional)
 
-These fields are parsed from STATS=0 and exported in two ways:
+These board-indexed fields are parsed from STATS=0 and exported in two ways:
 1) **aggregate** metrics (always, if fields exist), and
 2) **per-chip** series (only if `EXPORT_CHIP_METRICS=true`). Chips are indexed padded to 3 digits for support of up to 999 chips.
 
-### 6.1 `PVT_T0[ ... ]` — per-chip temperature list
+The exporter scans numeric array suffixes `0` through `15` and concatenates
+present arrays in board-index order before calculating aggregates or assigning
+per-chip labels. For example, an AvalonMiner 1047 with `PVT_T0` and `PVT_T1`
+contributes both boards to the same aggregate metrics.
+
+### 6.1 `PVT_T0[ ... ]`, `PVT_T1[ ... ]`, ... — per-chip temperature lists
 
 Raw format: list of integer temperatures (°C).  
 Exporter computes aggregates:
@@ -248,9 +285,9 @@ Exporter computes aggregates:
 
 If `EXPORT_CHIP_METRICS=true`, per-chip series:
 
-- `avalon_chip_temp_celsius{chip="0"} ...`
+- `avalon_chip_temp_celsius{chip="000"} ...`
 
-### 6.2 `PVT_V0[ ... ]` — per-chip voltage list
+### 6.2 `PVT_V0[ ... ]`, `PVT_V1[ ... ]`, ... — per-chip voltage lists
 
 Raw format: list of integers where `303` means **3.03 V**.
 
@@ -262,9 +299,9 @@ Exporter converts each element by dividing by 100.0 and exports aggregates:
 
 If `EXPORT_CHIP_METRICS=true`, per-chip series:
 
-- `avalon_chip_voltage_volts{chip="0"} ...`
+- `avalon_chip_voltage_volts{chip="000"} ...`
 
-### 6.3 `MW0[ ... ]` — per-chip matching-work / nonce activity list
+### 6.3 `MW0[ ... ]`, `MW1[ ... ]`, ... — per-chip matching-work / nonce activity lists
 
 Raw format: list of integers. This represents **per-chip matching-work / nonce activity** (relative work contribution).
 
@@ -277,7 +314,7 @@ Exporter exports aggregates:
 
 If `EXPORT_CHIP_METRICS=true`, per-chip series:
 
-- `avalon_chip_matching_work{chip="0"} ...`
+- `avalon_chip_matching_work{chip="000"} ...`
 
 ### 6.4 Chip count
 
@@ -285,7 +322,8 @@ The exporter computes:
 
 - `avalon_chip_count`
 
-as the maximum length across the three chip lists (`PVT_T0`, `PVT_V0`, `MW0`).
+as the maximum combined length across the temperature, voltage, and
+matching-work array families (`PVT_T*`, `PVT_V*`, and `MW*`).
 
 ---
 
