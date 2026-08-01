@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning: https://semver.org/
 
+## [Unreleased]
+
+_Nothing yet._
+
+## [v0.4.0] - 2026-08-01
+
+### Added
+- Add AvalonMiner 1047 support, contributed by [@nicosmuts](https://github.com/nicosmuts) in [PR #5](https://github.com/brav0charlie/avalonhome-prometheus-exporter/pull/5) ([ab39e58](https://github.com/brav0charlie/avalonhome-prometheus-exporter/commit/ab39e5807a11c9827971580822cd7882b59ac0ca)):
+  - Export current miner temperature from `Temp` as `avalon_temp_current_celsius`.
+  - Export secondary fan speed from `Fan2` as `avalon_fan2_rpm`.
+  - Export the official `SYSTEMSTATU` work states and hash-board count as `avalon_system_working` and `avalon_hash_boards`.
+  - Fall back to summary `MHS 30s` for `avalon_hashrate_ghs` when `GHSspd` is absent, and add one-, five-, and fifteen-minute hashrate metrics.
+  - Combine board-indexed `PVT_T*`, `PVT_V*`, and `MW*` arrays for chip aggregates and optional per-chip series.
+- Add sanitized `unittest` coverage for AvalonMiner 1047 metrics, multi-board chip telemetry, version identity, all four official work states, and unknown-state handling.
+
+### Changed
+- Expand `FIELDS-README.md` with the AvalonMiner 1047 field mappings, hashrate fallback rules, system-state behavior, and multi-board chip-array semantics.
+- Bump exporter, container, and user-facing version references to v0.4.0.
+
+### Changed (internal)
+- Add repository-wide Git, attribution, signing, history, and AI-assisted development standards.
+- Add `QUICKREF.md` with project commands, safety boundaries, testing expectations, release locations, and completion checklists.
+
+### Notes
+- AvalonMiner 1047 support was validated by the contributor against two live miners running CGMiner 4.11.1 / API 3.7.
+- Per-chip metrics remain disabled by default; aggregate chip metrics continue to be emitted when the firmware supplies the source arrays.
+- Power fields remain firmware-defined unless model-specific units are verified.
+
+[Unreleased]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/compare/v0.4.0...HEAD
+[v0.4.0]: https://github.com/brav0charlie/avalonhome-prometheus-exporter/releases/tag/v0.4.0
+
 ## [v0.3.2] - 2026-05-06
 
 ### Fixed

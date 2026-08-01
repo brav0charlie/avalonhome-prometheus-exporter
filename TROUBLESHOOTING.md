@@ -341,7 +341,7 @@ docker compose exec avalonhome-exporter sh -c "wget -qO- http://localhost:9100/h
 **Expected response:**
 ```
 OK
-version=0.3.2
+version=0.4.0
 ```
 
 **If unhealthy:**
