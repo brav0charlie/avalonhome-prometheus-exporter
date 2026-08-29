@@ -1,6 +1,6 @@
 ---
-version: 1.6.0
-last_updated: 2026-07-04
+version: 1.9.9
+last_updated: 2026-08-29
 ---
 
 # Git & Version Control Standards
@@ -24,6 +24,13 @@ short-lived branches that merge back via Pull Request.
 
 **Rules:**
 
+- Repository bootstrap is the sole exception to the rules below. A
+  human creates the project directory, initializes `main`, installs and
+  customizes the scaffold, makes one signed initial commit, creates the
+  empty GitHub repository, and pushes local `main`. Activate the
+  scaffold hook and branch protection immediately afterward. The role
+  lifecycle begins only once that remote `main` exists; the Architect
+  does not initialize a project or repository.
 - `main` is the single long-lived branch. It must always be in a
   releasable state.
 - Every change starts on a new branch off the latest `main`.
@@ -81,17 +88,49 @@ Bad: `claude-session-4`, `bills-branch`, `wip-2026-04-25`
 
 ```text
 git switch main
-git pull origin main
+git pull --ff-only origin main
 git switch -c feat/add-csv-export
 git push -u origin feat/add-csv-export
 ```
 
-After merge:
+After GitHub reports the squash merge complete:
 
 ```text
-git branch -d feat/add-csv-export
-git push origin --delete feat/add-csv-export
+set -euo pipefail
+
+feature_branch="feat/add-csv-export"
+merge_commit="$(gh pr view <PR#> --json state,mergedAt,mergeCommit \
+  --jq 'if .state == "MERGED" and .mergedAt != null and .mergeCommit.oid != null then .mergeCommit.oid else error("PR is not verified as merged") end')"
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ERROR: worktree or index is dirty; branch retained." >&2
+  exit 1
+fi
+git switch main
+git pull --ff-only origin main
+if ! git merge-base --is-ancestor "$merge_commit" main; then
+  echo "ERROR: verified merge commit is not on local main; branch retained." >&2
+  exit 1
+fi
+
+if git ls-remote --exit-code --heads origin "$feature_branch" >/dev/null 2>&1; then
+  git push origin --delete "$feature_branch"
+else
+  ls_remote_exit=$?
+  if [ "$ls_remote_exit" -ne 2 ]; then
+    echo "ERROR: remote branch lookup failed; branch retained." >&2
+    exit "$ls_remote_exit"
+  fi
+fi
+
+git fetch --prune origin
+git branch -D "$feature_branch"
 ```
+
+`git ls-remote --exit-code` returns `2` when no matching ref exists; that is
+the expected result when GitHub already deleted the merged head. Any other
+nonzero result is a lookup failure and must stop cleanup. Keep `set -e` active
+for the remaining commands so a failed pull, remote deletion, or fetch cannot
+fall through to local branch deletion.
 
 ---
 
@@ -121,7 +160,7 @@ Bad: `Added CSV export button`, `Adds CSV export button`
 
 ### Allowed Commit Types
 
-| Type | Meaning | SemVer bump |
+| Type | Meaning | SemVer impact |
 | ---------- | ----------------------------------------------- | ----------- |
 | `feat` | New user-visible feature | MINOR |
 | `fix` | Bug fix | PATCH |
@@ -184,8 +223,9 @@ Indicate in either of two ways:
 1. Append `!` after type/scope: `feat(api)!: rename FetchItems`
 2. Add a `BREAKING CHANGE:` footer.
 
-A breaking change always triggers a MAJOR version bump regardless of
-commit type.
+A breaking change always declares MAJOR SemVer impact regardless of
+commit type. The user still supplies the target when initiating the
+major release.
 
 ### Granularity
 
@@ -203,64 +243,66 @@ commit type.
 Every commit produced with AI assistance carries attribution,
 regardless of which tool wrote it. Repos may see commits from more
 than one AI coding assistant acting as a Builder (currently Claude
-Code and Codex CLI) — attribution must identify *which* tool, not just
+Code and Codex) — attribution must identify *which* tool, not just
 disclose that "AI was involved."
 
 ### Claude Code
 
-Attribution is **on by default**. Leave Claude Code's default settings
-in place.
+This project owns a stable Claude Code attribution identity rather than
+inheriting a model-specific vendor default. Commit the following shared
+project setting as `.claude/settings.json`:
 
-Default Claude Code trailers:
-
-```text
-Generated with Claude Code (https://claude.com/claude-code)
-Co-Authored-By: Claude <noreply@anthropic.com>
+```json
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>",
+    "pr": "Co-Authored-By: Claude Code <noreply@anthropic.com>"
+  }
+}
 ```
 
-These appear at the end of the commit message, after any `Closes #N` or
-`BREAKING CHANGE:` footers.
+The canonical Claude Code trailer is:
 
-Do not set `attribution.commit` or `attribution.pr` to empty strings in
-any `settings.json`. If those overrides exist from earlier projects,
-remove them.
+```text
+Co-Authored-By: Claude Code <noreply@anthropic.com>
+```
+
+It appears once at the end of the commit message, after any `Closes #N`
+or `BREAKING CHANGE:` footers. The preceding `Generated with` line is
+informational; the trailer is the normative tool identity.
+
+Claude Code applies settings from multiple scopes, so a personal or
+managed setting may override the shared project value. Before creating
+or amending a commit or PR, inspect the resulting text. Restore the
+canonical trailer when it is absent, replace a different Claude
+identity, and remove duplicates. Do not set `attribution.commit` or
+`attribution.pr` to empty strings. Personal project overrides belong in
+gitignored `.claude/settings.local.json`, not the shared file.
 
 GitHub's Squash-and-Merge UI rewrites `Co-Authored-By:` to lowercase
 `Co-authored-by:` in the resulting commit on `main`. Both forms parse
 identically for GitHub's contributor-attribution graph, so this is a
 display artifact, not a problem to fix.
 
-### Codex CLI
+### Codex
 
-Unlike Claude Code, Codex's commit attribution is **off by default**.
-The `codex_git_commit` feature and its `commit_attribution` trailer are
-opt-in — without enabling them, a Codex-authored commit on this repo
-carries no AI disclosure at all, silently, with nothing to flag it.
-Enable both before using Codex as a Builder on any repo governed by
-this standard.
+Current Codex releases do not expose a supported automatic commit
+attribution setting. Do not rely on the removed `codex_git_commit`
+feature or `commit_attribution` configuration. Instead, append this
+exact trailer manually to every Codex-assisted commit:
 
-One-time setup in `~/.codex/config.toml` (or a project-scoped
-`.codex/config.toml` if you want it repo-specific rather than global):
-
-```toml
-[features]
-codex_git_commit = true
-
-commit_attribution = "Codex <noreply@openai.com>"
+```text
+Co-Authored-By: Codex <noreply@openai.com>
 ```
 
-The value above is Codex's actual built-in default once the feature is
-enabled — setting it explicitly here just guards against that default
-changing silently in a future Codex release. Setting
-`commit_attribution = ""` disables the trailer entirely; never do this
-on a repo covered by this standard.
-
-Mechanically this works differently from Claude Code: Codex injects
-trailer instructions into its own prompt context rather than using a
-git hook, so the model is *told* to append the trailer rather than
-having it enforced mechanically. Treat the resulting disclosure the
-same as Claude Code's for policy purposes regardless — the
-authorship invariants below apply to both.
+Put the trailer after the commit body and any issue or breaking-change
+footers, separated by one blank line. The human developer remains the
+commit author and responsible party; the trailer records which AI tool
+assisted with the change. If Codex gains a supported automatic
+attribution mechanism in the future, it may replace this manual step
+only if the resulting commit retains equivalent tool-specific
+attribution.
 
 ### Other AI Tools
 
@@ -282,6 +324,23 @@ Co-Authored-By: <Tool Name> <noreply@example.com>
   was involved, not a co-ownership claim or a transfer of authorship —
   this applies equally to Claude Code, Codex, or any other tool's
   trailer.
+
+### PR and Squash Attribution (All Tools)
+
+Every AI-assisted PR body ends with the exact `Co-Authored-By` trailer
+for each tool that assisted with the delivered change. Use the same
+identity required for commits above. Put the trailers after all PR
+sections and checklist items, separated from the preceding text by one
+blank line. They must be the final non-comment lines of the PR body and
+each required tool identity must appear exactly once. Automatic tool
+output does not excuse a missing trailer or justify a duplicate one.
+
+This is not redundant with feature-branch commit attribution. Squash
+and Merge creates a new commit on `main`; this workflow configures that
+commit to use the PR title and description, so the PR-body trailers are
+what preserve tool-specific provenance on the lasting commit. Before
+merging, confirm the generated squash message still ends with every
+required trailer.
 
 **Why keep attribution on:** The EU AI Act's transparency obligations and
 California's expanding AI disclosure regime are pushing toward "disclose
@@ -310,6 +369,60 @@ lands on `main` when squash-merged.
 feat(export): add CSV export button to inventory list
 ```
 
+### Governance Changes
+
+A PR is governed by the binding instructions and rule documents at the
+PR's exact base commit. If the PR changes `AGENTS.md`,
+`GIT_STANDARDS.md`, a routed `*_RULES.md` file, a role skill, or another
+binding governance artifact, the candidate version is reviewed as
+proposed content; it cannot redefine or waive the rules used to judge
+its own PR. The new version becomes binding only after merge.
+
+Reviewers record the exact base and head SHAs. They read the base
+governance files from the base SHA and the proposed replacements from
+the head SHA, keeping the two roles explicit throughout the review.
+
+### Review Readiness
+
+Before issuing a verdict, the Reviewer records a PR metadata snapshot
+that includes its open/draft state, base and head branches and SHAs,
+mergeability, merge-state details, review decision and requests, latest
+reviews, complete paginated review history, inline review comments,
+issue-level PR comments, review-thread resolution and outdated state, and
+status-check rollup. Complete comment content comes from the paginated REST
+surfaces; thread state comes from GitHub's paginated GraphQL
+[`PullRequestReviewThread`](https://docs.github.com/en/graphql/reference/objects#pullrequestreviewthread)
+surface. Detailed CI results come from `gh pr checks`; if the repository has
+no checks, say so
+explicitly rather than treating the absence as a passing run.
+
+A `PASS` verdict requires all of the following:
+
+- The PR is open, is not a draft, and targets `main`.
+- GitHub does not report the PR as conflicting. Any other merge-state
+  blocker is identified and evaluated rather than ignored.
+- Every required status check has completed successfully. Pending,
+  failing, cancelled, or action-required checks block `PASS` until they
+  are resolved. Passing CI supports the review but does not replace
+  independent verification of the task contract.
+- Review requests, the aggregate review decision, latest reviews, the
+  complete paginated review history, inline review comments, and
+  issue-level PR comments have been inspected. Outstanding requests are
+  reported; every prior request-changes verdict is explicitly accounted
+  for during re-review.
+- Every review thread's resolution and outdated state has been inspected.
+  An unresolved, non-outdated thread blocks `PASS`. An unresolved outdated
+  thread also blocks when its concern still applies, branch protection
+  still reports it as a blocker, or resolution cannot be established.
+
+Immediately before leaving the review, fetch the metadata, complete
+review history, inline and issue-level PR comments, review-thread state,
+and checks again. If either the base or head SHA changed since the initial
+snapshot, the prior analysis is stale: do not post it, and restart the
+review against the new exact SHAs. If readiness state changed without a
+SHA change, apply the current state to the verdict and withhold `PASS`
+while any required gate above is unsatisfied.
+
 ### PR Description Template
 
 ```markdown
@@ -317,19 +430,32 @@ feat(export): add CSV export button to inventory list
 
 Brief summary of what this PR changes.
 
+Implements: history/tasks/TASK-YYYYMMDDTHHMMSSZ-ssss-short-slug.md
+
+Constrained by: history/decisions/ADR-YYYYMMDDTHHMMSSZ-ssss-short-slug.md
+(omit when no ADR applies)
+
 ## Why
 
 The motivation. Link to issue, ticket, or context.
 
 ## How
 
-Notable implementation decisions, especially anything non-obvious or
-anything reviewers should pay extra attention to.
+A concise, review-facing summary of notable implementation decisions,
+especially anything non-obvious or anything reviewers should pay extra
+attention to. Do not paste a private Builder prompt, chronological
+session transcript, or complete Builder record here.
 
 ## Testing
 
 How this was verified. Screenshots for UI changes. Build/test output
 for non-trivial logic.
+
+## Release impact
+
+SemVer impact: major | minor | patch | none
+
+For a release PR only: Release target: X.Y.Z
 
 ## Checklist
 
@@ -337,29 +463,62 @@ for non-trivial logic.
 - [ ] Tests pass locally
 - [ ] No secrets, API keys, or credentials in the diff
 - [ ] CHANGELOG updated (if user-visible change)
+- [ ] SemVer impact declared and supported by the diff
+- [ ] Project version unchanged (unless this is a release PR)
 - [ ] Documentation updated (if behavior or API changed)
+
+Co-Authored-By: <Tool Name> <noreply@example.com>
 ```
+
+Replace the final attribution placeholder with the exact tool identity
+from Section 4. Add one final trailer line per assisting tool.
 
 ### Merging
 
 - **Always Squash and Merge.** Never "Create a merge commit." Never
   "Rebase and Merge."
-- The squash commit message is the PR title plus the PR body.
-- Delete the branch after merge, both on GitHub and locally.
+- The squash commit message is the PR title plus the PR body. Configure
+  the repository's default to **Pull request title and description**. Verify
+  the two independent API fields: `.squash_merge_commit_title` must be
+  `PR_TITLE`, and `.squash_merge_commit_message` must be `PR_BODY`:
+
+  ```text
+  gh api repos/{owner}/{repo} --jq '
+    if .squash_merge_commit_title == "PR_TITLE"
+       and .squash_merge_commit_message == "PR_BODY"
+    then {
+      title: .squash_merge_commit_title,
+      message: .squash_merge_commit_message
+    }
+    else error("squash title/message defaults are not PR_TITLE and PR_BODY")
+    end'
+  ```
+
+  Verify the final tool-attribution trailers are present before merging.
+- Delete the branch after merge, both on GitHub and locally. First verify the
+  PR is merged and its reported merge commit is on updated local `main`.
+  Remote deletion is conditional because the repository normally deletes
+  merged heads automatically. A squash creates a new commit instead of
+  making the feature tip an ancestor of `main`, so local cleanup uses `-D`
+  only after those merge checks succeed; ordinary `-d` is expected to refuse.
 
 **Why squash:** One commit per PR keeps `main` history linear and
 readable. `git revert` becomes a one-commit operation. `git bisect`
 works cleanly because each commit on `main` represents a complete,
 working change.
 
-**What signs the merge commit.** Squash-and-Merge (and Rebase-and-Merge)
-commits are constructed by GitHub's servers and signed with GitHub's
-web-flow GPG key, not your local SSH key. This is expected: your key
-isn't accessible to GitHub's servers, so attributing the signature to it
-would be inaccurate. The `Author` field still names you (you authored
-the content), and the original PR commit retains your signature on the
-PR record. For local verification of merge commits, import GitHub's
-web-flow public key per Section 7 ("Local Verification").
+**What signs the squash commit.** A Squash-and-Merge commit is
+constructed by GitHub's servers and signed with GitHub's web-flow GPG
+key, not your local SSH key. This is expected: your key isn't accessible
+to GitHub's servers, so attributing the signature to it would be
+inaccurate. The `Author` field still names you (you authored the
+content), and the original PR commit retains your signature on the PR
+record. For local verification of squash commits, import GitHub's
+web-flow public key per Section 7 ("Local Verification"). GitHub's
+Rebase-and-Merge option instead creates modified commits without commit
+signature verification; that is another reason this workflow prohibits
+it. See GitHub's [signature-verification
+documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#signature-verification-for-rebase-and-merge).
 
 ---
 
@@ -369,18 +528,61 @@ web-flow public key per Section 7 ("Local Verification").
 
 Format: `MAJOR.MINOR.PATCH`
 
-| Bump | When |
-| ----- | ------------------------------------------------------ |
-| MAJOR | Breaking change |
-| MINOR | New backward-compatible feature |
-| PATCH | Backward-compatible bug fix or internal change |
+| Impact | When |
+| ------ | --------------------------------------------------- |
+| MAJOR | Breaking product or API change |
+| MINOR | New backward-compatible feature or capability |
+| PATCH | Backward-compatible bug fix or performance correction |
+| None | Internal refactor, docs, tests, build, CI, or maintenance |
+
+Each ordinary task PR declares its highest impact using
+`major > minor > patch > none`. Record it as `SemVer impact:` in the PR
+description and as `semver_impact` in the Builder receipt. Update
+`CHANGELOG.md` under `[Unreleased]` in the same PR, but do **not** change
+the project's version declarations. Commit type is a useful default;
+the actual compatibility impact of the complete task is authoritative.
+
+Versions change only in dedicated, user-initiated release PRs. A
+release is not a build step and never happens automatically when an
+ordinary task finishes.
+
+### Release PR workflow
+
+1. The user explicitly initiates a release. The Architect inspects the
+   latest release tag and the receipt corresponding to every
+   `[Unreleased]` entry to derive a MINOR target (increment MINOR and
+   reset PATCH) or PATCH target (increment PATCH), then creates the task
+   and `release/vX.Y.Z` branch from current `main`. An exact major target
+   supplied by the user takes precedence and may represent a standalone
+   product milestone even when no unreleased task declares `major`. If
+   a task does declare `major` and the user supplied no target, stop and
+   ask for it. Agents never choose a major target.
+2. The Builder independently recomputes the highest unreleased impact
+   and verifies that the result matches the task brief and branch name.
+   Stop and report any mismatch before changing a version declaration.
+   If an unreleased entry has no receipt or declared impact, ask the
+   user to classify it. If no tag or authoritative base version exists,
+   ask the user for the initial target.
+3. Update every authoritative version declaration to the target. Move
+   all `[Unreleased]` entries under a dated version heading, restore an
+   empty `[Unreleased]` section, and replace each `[#PR]` reference with
+   that PR's actual squash-commit short hash. The release-preparation PR
+   does not add an entry for itself back under `[Unreleased]`.
+4. Draft paste-ready release notes from the released changelog entries.
+   Do not tag or publish them before the release PR is reviewed and
+   merged and the user authorizes the publication step.
+5. The release task receipt records `semver_impact: none` and
+   `release_target: "X.Y.Z"`. The release PR packages already-reviewed
+   changes; it does not create an additional product impact.
 
 For App Store apps, the SemVer version maps to
 `CFBundleShortVersionString` (marketing version). The `CFBundleVersion`
 (build number) is independent and increments per submission.
 
-While pre-1.0, any change can bump MINOR or PATCH freely, and breaking
-changes do not require a MAJOR bump until `1.0.0`.
+While pre-1.0, user-visible compatibility changes normally declare
+`minor`; fixes normally declare `patch`. The user still decides when
+the product is ready for `1.0.0`, and agents do not cross that major
+boundary automatically.
 
 ### Tagging
 
@@ -388,11 +590,28 @@ Tag after merging a release commit (typically a `release/` branch that
 bumps the version and updates the changelog):
 
 ```text
+set -euo pipefail
+
+release_version="1.2.0"
+release_merge_commit="$(gh pr view <PR#> --json state,mergedAt,mergeCommit \
+  --jq 'if .state == "MERGED" and .mergedAt != null and .mergeCommit.oid != null then .mergeCommit.oid else error("release PR is not verified as merged") end')"
 git switch main
-git pull origin main
-git tag -s v1.2.0 -m "Release 1.2.0"
-git push origin v1.2.0
+git pull --ff-only origin main
+if ! git merge-base --is-ancestor "$release_merge_commit" main; then
+  echo "ERROR: verified release merge commit is not on local main; tag not created." >&2
+  exit 1
+fi
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ERROR: worktree or index is dirty; tag not created." >&2
+  exit 1
+fi
+git tag -s "v$release_version" -m "Release $release_version"
+git push origin "v$release_version"
 ```
+
+Run this only after the user authorizes tagging and publication. Every merge
+query, synchronization, ancestry, and cleanliness check must succeed before
+creating the tag; do not continue manually after an earlier command fails.
 
 **Tag rules:**
 
@@ -594,10 +813,15 @@ case-insensitive variant) defends against path-capitalization drift.
 
 ## 8. The `.gitignore`
 
-Every repository has a `.gitignore` committed at the root from the first
-commit. Never commit secrets; if one is committed accidentally, rotate
-the secret first, then remove it from history with `git-filter-repo` or
-the BFG Repo-Cleaner.
+Every repository has a project-specific `.gitignore` committed at the
+root from the first commit. Start with the workflow-safe scaffold seed,
+then add only the language, toolchain, IDE, generated-output, local
+configuration, and secret patterns that apply to that project. The
+examples below are menus, not universal blocks to copy unchanged.
+
+Never commit secrets; if one is committed accidentally, rotate the
+secret first, then remove it from history with `git-filter-repo` or the
+BFG Repo-Cleaner.
 
 ### Swift / Xcode Projects
 
@@ -682,22 +906,83 @@ venv/
   immediately — removing from history is not sufficient on its own.
 - Never commit machine-specific paths or absolute paths.
 - Never commit binary build artifacts that can be regenerated.
-- When in doubt, ignore it. Adding to `.gitignore` later is harder than
-  removing if you change your mind.
+- Keep `history/prompts/*` ignored while allowing
+  `history/prompts/.gitkeep`; the Architect-to-Builder handoff depends
+  on this boundary.
+- Add an ignore only when the project actually produces or locally owns
+  that path. Do not hide potentially meaningful source files merely
+  because another language or editor treats the same name as generated.
 
 ---
 
 ## 9. Repository Hygiene
 
-### Required Root Files
+### Root Project Files
 
 | File | Purpose |
 | ---------------- | ---------------------------------------------------- |
 | `README.md` | What the project is, how to build/run it |
-| `LICENSE` | License text. Default: MIT |
+| `LICENSE` | License text when a license has been selected; may be absent for a private proprietary project |
 | `.gitignore` | See Section 8 |
 | `CHANGELOG.md` | Human-readable release history (Keep a Changelog) |
 | `.gitattributes` | Line-ending normalization |
+
+`README.md`, `.gitignore`, `.gitattributes`, and any `LICENSE` are
+project-specific. Fill in or tailor their scaffold versions before the
+first commit. Do not assume an open-source license: when a private
+project has not selected one, omit `LICENSE` and state in the README
+that the project is proprietary and no license is granted.
+
+### Workflow identifiers
+
+New task and decision records use distributed, chronologically sortable
+identifiers:
+
+```text
+TASK-YYYYMMDDTHHMMSSZ-ssss-short-slug.md
+ADR-YYYYMMDDTHHMMSSZ-ssss-short-slug.md
+```
+
+The timestamp is the record's UTC creation time. The suffix is four
+lowercase base32 characters (`[a-z2-7]{4}`). The stable identifier stops
+before the human-readable filename slug. Confirm the candidate ID is
+unused and regenerate the suffix on collision; never allocate by
+scanning for a "next" number. Historical sequential IDs remain valid
+and must not be renamed.
+
+### Builder receipt schema
+
+Each new or migrated task-scoped Builder record begins with
+schema-versioned, strict JSON front matter. JSON is valid YAML, but the
+stricter serialization lets every scaffold validate receipts with
+Python's standard library instead of adding a project-language YAML
+dependency.
+
+- `history/logs/receipt.schema.json` is the normative object schema.
+- `.git/hooks/validate-builder-receipt.py` enforces that schema plus
+  cross-field invariants that JSON Schema cannot express concisely. It is
+  installed beside `.git/hooks/pre-commit`; both are local Git runtime files,
+  not tracked project artifacts.
+- `.git/hooks/pre-commit` validates each staged task-record blob with the
+  installed validator and the schema from the same index snapshot. It
+  self-tests that runtime/schema pair whenever a receipt or schema changes.
+  Its integrity inventory includes deletions of tracked workflow records, so
+  a deletion-only change cannot orphan a task or record.
+- A task brief and its sole Builder record use the same filename under
+  `history/tasks/` and `history/logs/`. The validator enforces that
+  exact filename identity; the hook enforces one task and one record per
+  stable task ID in the resulting index.
+- Schema version 3 defines typed evidence, automated/manual
+  verification, and known-deviation objects. Unknown fields fail
+  validation. Automated `passed` results require exit code `0`, `failed`
+  results require a nonzero exit code, and `not_run` requires null;
+  incompatible changes require a schema-version bump.
+- Historical receipts keep their recorded schema version. If an old
+  receipt is edited, migrate its front matter to the current schema as
+  part of that change.
+- The active hook and validator are installed under the private Git directory,
+  so content checks scan every staged project file without a hook-source
+  exception.
 
 ### `CHANGELOG.md`
 
@@ -711,6 +996,31 @@ top at all times, even when empty (a placeholder like `_Nothing yet._`
 beats omitting the heading and having to remember to add it back).
 This is the single changelog for the project - there is no separate
 weekly or internal-status changelog to keep in sync with it.
+
+Choose the section from the delivered outcome, not mechanically from
+the Conventional Commit type. Apply the first matching row to each
+distinct release-facing outcome; one PR reference may appear in more
+than one section only when the PR genuinely delivers independent
+outcomes. Nested detail under one entry is preferable to splitting one
+outcome into several bullets.
+
+| Delivered outcome | Changelog section | Typical commit type |
+| ----------------- | ----------------- | ------------------- |
+| Security vulnerability fixed or security posture materially hardened | `Security` | `fix`, `build`, `chore` |
+| Supported capability, API, or behavior removed | `Removed` | `feat`, `refactor`, `chore` |
+| Capability, API, or behavior marked for future removal | `Deprecated` | `feat`, `docs`, `chore` |
+| Defect corrected, including a backward-compatible performance correction | `Fixed` | `fix`, `perf` |
+| New backward-compatible user or developer capability | `Added` | `feat` |
+| Existing user-visible behavior, API, or shipped documentation changed | `Changed` | `feat`, `refactor`, `docs` |
+| Noteworthy engineering-only change with no user-visible effect | `Changed (internal)` | `refactor`, `build`, `ci`, `test`, `chore`, `docs` |
+| No notable release-facing or future-maintainer value | no entry | `style`, routine internal maintenance |
+
+The commit type remains a useful consistency check, but it cannot be
+the classifier: Conventional Commits has no required `security`,
+`removed`, or `deprecated` type, and the same type can produce different
+release outcomes. If one change appears to fit multiple rows, use the
+most specific outcome; `Security`, `Removed`, and `Deprecated` take
+precedence over generic `Fixed`, `Added`, or `Changed` wording.
 
 Each bullet references the change it came from, but *what* it
 references depends on whether the change has been released yet:
@@ -730,10 +1040,12 @@ references depends on whether the change has been released yet:
   mergeCommit` or by matching the PR title in `git log --oneline`.
 
 Where a change was governed by or produced an ADR, cite it inline in
-parentheses at the end of the bullet - `(ADR-0007)`. This is a
+parentheses at the end of the bullet, such as
+`(ADR-20260828T154703Z-a7f2)`. This is a
 separate reference from the PR/hash: PR and hash point to the diff,
 the ADR points to the reasoning. Not every entry has one; add it
-wherever an ADR exists for that change.
+wherever an ADR exists for that change. Always use the ADR's full
+stable ID.
 
 ```markdown
 # Changelog
@@ -785,6 +1097,7 @@ Enable on `main` for every repo. Even solo, this prevents accidents.
 - Require a pull request before merging: ON
   - Required approvals: 0 (solo) or 1 (when collaborating)
   - Dismiss stale approvals on new commits: ON
+- Require conversation resolution before merging: ON
 - Require status checks to pass before merging: ON (once CI exists)
   - Require branches to be up to date before merging: ON
 - Require linear history: ON
@@ -800,15 +1113,19 @@ on first touch.
 **Default merge settings** (Settings → General → Pull Requests):
 
 - Allow squash merging: ON
+  - Default commit title: Pull request title (`PR_TITLE`)
+  - Default commit message: Pull request title and description (`PR_BODY`)
 - Allow merge commits: OFF
 - Allow rebase merging: OFF
 - Always suggest updating pull request branches: ON
 - Automatically delete head branches: ON
 
-Local rebasing of feature branches is allowed to keep history clean.
-Never rebase `main`. If a PR requires rebasing due to conflicts, rebase
-locally and force-push with `--force-with-lease` only — only on your own
-branch, and never after merge.
+Local rebasing, amending, and commit reordering are allowed only before
+a branch's first push. Never rebase `main`. After a feature branch is
+published, its history is append-only: add corrective commits, or merge
+the latest `origin/main` into the feature branch to resolve divergence,
+then push normally. Squash and Merge will still produce one commit on
+`main`.
 
 ---
 
@@ -816,13 +1133,14 @@ branch, and never after merge.
 
 These are hard rules, not style preferences.
 
-- **Never force-push to `main`.** Branch protection enforces this. If
-  you find yourself wanting to, stop and examine what went wrong.
-- **Never rewrite published history.** Once a commit is pushed and may
-  have been pulled, it is immutable. Use `git revert` to undo. The
-  exception is your own feature branch before it is merged — rebasing
-  locally is fine; force-pushing after a PR is open requires
-  `--force-with-lease` only.
+- **Never force-push any branch.** Do not use `--force` or
+  `--force-with-lease`. Branch protection enforces this on `main`; this
+  policy extends the same rule to feature and release branches.
+- **Never rewrite published history.** Once a commit is pushed, it is
+  immutable. Add a corrective commit, use `git revert` to undo, or merge
+  the latest `origin/main` into the feature branch when it must be
+  brought up to date. Unpublished local commits may still be reordered,
+  squashed, or amended before the branch's first push.
 - **Never commit secrets.** API keys, signing keys, passwords, OAuth
   tokens, certificates, private keys, App Store Connect API keys — none
   of this goes in the repo. Not even temporarily. Not even in a comment.
@@ -847,7 +1165,7 @@ These are hard rules, not style preferences.
 ```text
 # Start of work
 git switch main
-git pull origin main
+git pull --ff-only origin main
 git switch -c feat/add-csv-export
 
 # During work — repeat after each working, testable piece
@@ -859,12 +1177,13 @@ git commit -m "feat(export): add CSV export button to inventory list"
 
 # Push and open PR
 git push -u origin feat/add-csv-export
-gh pr create --base main --fill
+gh pr create --base main \
+  --title "feat(export): add CSV export button to inventory list" \
+  --body-file /tmp/pr-description.md
 
 # After squash merge on GitHub
-git switch main
-git pull origin main
-git branch -d feat/add-csv-export
+# Run the complete fail-closed post-merge cleanup block from Section 2.
+# Do not omit its merge, ancestry, remote-lookup, fetch, or deletion gates.
 ```
 
 ---
@@ -878,19 +1197,22 @@ are non-negotiable:
    any commits or branch operations.
 2. **Never commit directly to `main`.** Always create a properly named
    feature branch first.
-3. **Preserve default AI attribution for your tool** (Section 4):
-   - **Claude Code:** do not strip the `Co-Authored-By: Claude` trailer
-     or the `Generated with Claude Code` line from commits or PRs. Do
-     not set `attribution.commit` or `attribution.pr` to empty strings
-     in any `settings.json`.
-   - **Codex CLI:** confirm `[features] codex_git_commit` is enabled
-     and `commit_attribution` is not set to `""` in `config.toml`
-     before committing. Missing attribution on a Codex-authored commit
-     is a configuration problem to flag and fix — not something to
-     paper over by hand-typing a substitute trailer.
+3. **Preserve the project-owned AI attribution for your tool** (Section
+   4):
+   - **Claude Code:** use the shared `.claude/settings.json`, then
+     inspect the actual commit or PR text and ensure it contains exactly
+     one `Co-Authored-By: Claude Code <noreply@anthropic.com>` trailer.
+     Do not set `attribution.commit` or `attribution.pr` to empty strings
+     in any settings file.
+   - **Codex:** manually append
+     `Co-Authored-By: Codex <noreply@openai.com>` to every
+     Codex-assisted commit. Do not rely on the removed
+     `codex_git_commit` feature or `commit_attribution` setting.
    - **Any other tool:** if it has no built-in attribution mechanism,
      manually append a `Co-Authored-By: <Tool Name> <noreply@...>`
      trailer per Section 4.
+   - Put the same exact trailer or trailers exactly once at the end of
+     the PR body so Squash and Merge preserves attribution on `main`.
 4. **Always show the diff before staging.** Run `git status` and
    `git diff` and surface the output before running `git add`.
 5. **Use Conventional Commits format** for every commit subject,
@@ -939,7 +1261,6 @@ Add to `~/.gitconfig` under `[alias]`:
     br = branch
     last = log -1 HEAD --show-signature
     lg = log --oneline --graph --decorate --all -20
-    pushf = push --force-with-lease
     unstage = reset HEAD --
     amend = commit --amend --no-edit
 ```
